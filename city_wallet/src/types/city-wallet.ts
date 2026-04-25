@@ -54,6 +54,26 @@ export type Redemption = {
   status: string;
 };
 
+export type CouponCategory = "food" | "retail" | "entertainment" | "wellness" | "transport";
+
+export type Coupon = {
+  id: string;
+  company: string;
+  logoLetter: string;
+  brandColor: string;
+  accentColor: string;
+  category: CouponCategory;
+  offer: string;
+  offerDetail: string;
+  location: string;
+  distanceMeters: number;
+  validUntil: string;
+  token: string;
+  status: "active" | "redeemed" | "expired";
+  redeemedAt?: string;
+  savings?: string;
+};
+
 /* ── Context engine types ── */
 
 export type TimeOfDay = "morning" | "lunch" | "afternoon" | "evening";

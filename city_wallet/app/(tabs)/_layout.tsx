@@ -6,11 +6,10 @@ import { CW, fontFamily } from "@/src/theme/tokens";
 type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
 
 const TAB_ITEMS: { name: string; label: string; icon: IoniconsName; iconActive: IoniconsName }[] = [
-  { name: "index",    label: "Home",     icon: "home-outline",    iconActive: "home" },
-  { name: "cards",    label: "Cards",    icon: "card-outline",    iconActive: "card" },
-  { name: "services", label: "Services", icon: "grid-outline",    iconActive: "grid" },
-  { name: "activity", label: "Activity", icon: "pulse-outline",   iconActive: "pulse" },
-  { name: "profile",  label: "Profile",  icon: "person-outline",  iconActive: "person" },
+  { name: "index",    label: "Home",     icon: "home-outline",    iconActive: "home"    },
+  { name: "coupons",  label: "Coupons",  icon: "ticket-outline",  iconActive: "ticket"  },
+  { name: "activity", label: "Activity", icon: "time-outline",    iconActive: "time"    },
+  { name: "profile",  label: "Profile",  icon: "person-outline",  iconActive: "person"  },
 ];
 
 export default function TabsLayout() {
@@ -52,6 +51,9 @@ export default function TabsLayout() {
           }}
         />
       ))}
+      {/* Hide legacy tabs from bar – routes kept for backward nav */}
+      <Tabs.Screen name="cards"    options={{ href: null }} />
+      <Tabs.Screen name="services" options={{ href: null }} />
     </Tabs>
   );
 }
