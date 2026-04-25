@@ -1,50 +1,68 @@
-# Welcome to your Expo app 👋
+# City Wallet App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo Go-compatible mobile app scaffold for the Generative City Wallet hackathon
+project. It currently uses mock data and placeholder interfaces so different
+team members can work on backend, context, AI, and UI without blocking each
+other.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Running Locally
 
 ```bash
-npm run reset-project
+npm install
+npm start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Open the project with Expo Go from the Metro output.
 
-## Learn more
+## Environment
 
-To learn more about developing your project with Expo, look at the following resources:
+Firebase is initialized with the Firebase JS SDK for Expo Go compatibility.
+Create a local `.env` file from `.env.example` when Firebase credentials are
+available:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+cp .env.example .env
+```
 
-## Join the community
+Only `EXPO_PUBLIC_FIREBASE_*` variables are expected in this first pass.
 
-Join our community of developers creating universal apps.
+## Structure
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `app/index.tsx` - Consumer home with one mock generated offer.
+- `app/offers/[id].tsx` - Offer detail screen.
+- `app/redeem/[id].tsx` - Placeholder redemption token/QR screen.
+- `app/merchant/dashboard.tsx` - Merchant performance mock dashboard.
+- `app/merchant/rules.tsx` - Merchant rule/guardrail mock screen.
+- `src/components/` - Shared UI building blocks.
+- `src/data/mockData.ts` - Temporary data for the scaffold.
+- `src/types/city-wallet.ts` - Shared domain types.
+- `src/lib/firebase.ts` - Firebase app and Firestore initialization.
+- `src/lib/firebaseRepositories.ts` - Backend stubs for future Firestore work.
+- `src/context-engine/ContextProvider.ts` - Context provider interface and mock.
+- `src/ai/OfferGenerator.ts` - Offer generator interface and mock.
+
+## How to Work With It
+
+- UI work should add screens under `app/` and reusable pieces under
+  `src/components/`.
+- Backend work should replace the stub functions in `src/lib/` with Firestore
+  reads and writes.
+- Context work should replace `mockContextProvider` with location, weather,
+  events, and demand signal processing.
+- AI work should replace `mockOfferGenerator` with a real generation adapter.
+  Keep this Expo Go-safe until the team intentionally moves to a development
+  build for native on-device model support.
+- Shared data contracts should be added to `src/types/city-wallet.ts` before
+  being used across screens or services.
+
+## Checks
+
+```bash
+npm run lint
+npx tsc --noEmit
+```
+
+## Current Scope
+
+This scaffold does not yet implement real Firestore persistence, real context
+signals, push notifications, QR validation, or React Native AI native modules.
