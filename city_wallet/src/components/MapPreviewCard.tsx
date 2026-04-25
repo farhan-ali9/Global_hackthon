@@ -4,15 +4,9 @@ import { useRouter, type Href } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 
+import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
 import { MAP_MERCHANTS, USER_LOCATION } from "@/src/data/mockData";
 import { CW, fontFamily } from "@/src/theme/tokens";
-
-const PREVIEW_REGION = {
-  latitude: USER_LOCATION.latitude,
-  longitude: USER_LOCATION.longitude,
-  latitudeDelta: 0.018,
-  longitudeDelta: 0.018,
-};
 
 /**
  * Card-sized non-interactive map preview.
@@ -20,6 +14,14 @@ const PREVIEW_REGION = {
  */
 export function MapPreviewCard() {
   const router = useRouter();
+  const { context } = useUserContextLoop();
+  const userCoordinates = context?.coordinates ?? USER_LOCATION;
+  const previewRegion = {
+    latitude: userCoordinates.latitude,
+    longitude: userCoordinates.longitude,
+    latitudeDelta: 0.018,
+    longitudeDelta: 0.018,
+  };
 
   return (
     <Pressable
@@ -34,7 +36,7 @@ export function MapPreviewCard() {
         <MapView
           style={styles.map}
           provider={PROVIDER_DEFAULT}
-          initialRegion={PREVIEW_REGION}
+          region={previewRegion}
           scrollEnabled={false}
           zoomEnabled={false}
           pitchEnabled={false}
@@ -51,7 +53,7 @@ export function MapPreviewCard() {
         >
           {/* User location pin */}
           <Marker
-            coordinate={USER_LOCATION}
+            coordinate={userCoordinates}
             anchor={{ x: 0.5, y: 0.5 }}
           >
             <View style={styles.userDot}>

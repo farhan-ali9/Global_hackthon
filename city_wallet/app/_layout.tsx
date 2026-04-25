@@ -11,6 +11,8 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { UserContextLoopProvider } from "@/src/context-engine/UserContextLoopProvider";
+
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -32,20 +34,22 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="scan"
-          options={{ presentation: "modal", animation: "slide_from_bottom" }}
-        />
-        <Stack.Screen name="coupon/[id]" options={{ animation: "slide_from_right" }} />
-        <Stack.Screen name="map/index" options={{ animation: "slide_from_bottom" }} />
-        <Stack.Screen name="offers/[id]" />
-        <Stack.Screen name="redeem/[id]" />
-        <Stack.Screen name="merchant/dashboard" />
-        <Stack.Screen name="merchant/rules" />
-      </Stack>
+      <UserContextLoopProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen
+            name="scan"
+            options={{ presentation: "modal", animation: "slide_from_bottom" }}
+          />
+          <Stack.Screen name="coupon/[id]" options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="map/index" options={{ animation: "slide_from_bottom" }} />
+          <Stack.Screen name="offers/[id]" />
+          <Stack.Screen name="redeem/[id]" />
+          <Stack.Screen name="merchant/dashboard" />
+          <Stack.Screen name="merchant/rules" />
+        </Stack>
+      </UserContextLoopProvider>
     </SafeAreaProvider>
   );
 }

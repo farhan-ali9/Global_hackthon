@@ -1,10 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -13,34 +11,39 @@ import {
 import MapView, { Callout, Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
 import { MAP_MERCHANTS, USER_LOCATION, type MapMerchant } from "@/src/data/mockData";
 import { CW, fontFamily } from "@/src/theme/tokens";
-
-const MUNICH_CENTER = {
-  latitude: USER_LOCATION.latitude,
-  longitude: USER_LOCATION.longitude,
-  latitudeDelta: 0.025,
-  longitudeDelta: 0.025,
-};
 
 export default function FullMapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
+  const hasCenteredLiveLocationRef = useRef(false);
+  const { context } = useUserContextLoop();
 
-  const [locationGranted, setLocationGranted] = useState(false);
   const [selected, setSelected] = useState<MapMerchant | null>(null);
+  const userCoordinates = context?.coordinates ?? USER_LOCATION;
+  const userRegion = useMemo(
+    () => ({
+      latitude: userCoordinates.latitude,
+      longitude: userCoordinates.longitude,
+      latitudeDelta: 0.025,
+      longitudeDelta: 0.025,
+    }),
+    [userCoordinates.latitude, userCoordinates.longitude],
+  );
 
   useEffect(() => {
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      setLocationGranted(status === "granted");
-    })();
-  }, []);
+    if (context === null || hasCenteredLiveLocationRef.current) return;
+
+    hasCenteredLiveLocationRef.current = true;
+    mapRef.current?.animateToRegion(userRegion, 600);
+  }, [context, userRegion]);
 
   function focusUser() {
     mapRef.current?.animateToRegion(
-      { ...USER_LOCATION, latitudeDelta: 0.015, longitudeDelta: 0.015 },
+      { ...userCoordinates, latitudeDelta: 0.015, longitudeDelta: 0.015 },
       600,
     );
   }
@@ -52,12 +55,18 @@ export default function FullMapScreen() {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_DEFAULT}
-        initialRegion={MUNICH_CENTER}
-        showsUserLocation={locationGranted}
+        initialRegion={userRegion}
+        showsUserLocation={false}
         showsMyLocationButton={false}
         showsCompass={false}
         customMapStyle={MAP_STYLE}
       >
+        <Marker coordinate={userCoordinates} anchor={{ x: 0.5, y: 0.5 }}>
+          <View style={styles.userDot}>
+            <View style={styles.userDotInner} />
+          </View>
+        </Marker>
+
         {/* Merchant markers */}
         {MAP_MERCHANTS.map((m) => (
           <Marker
@@ -149,8 +158,8 @@ export default function FullMapScreen() {
             <Ionicons name="location-outline" size={13} color={CW.soft} />
             <Text style={styles.distText}>
               {getDistanceMeters(
-                USER_LOCATION.latitude,
-                USER_LOCATION.longitude,
+                userCoordinates.latitude,
+                userCoordinates.longitude,
                 selected.latitude,
                 selected.longitude,
               )}{" "}
@@ -261,6 +270,22 @@ const styles = StyleSheet.create({
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     marginTop: -1,
+  },
+  userDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(29,115,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  userDotInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#1D73FF",
+    borderWidth: 2,
+    borderColor: "#fff",
   },
 
   /* bottom merchant card */

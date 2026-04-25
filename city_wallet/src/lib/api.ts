@@ -1,6 +1,9 @@
 import type {
   AnonymizedContextPayload,
+  GeneratedCouponResponse,
   GeneratedOfferResponse,
+  GenerateCouponRequest,
+  MerchantSummary,
   RedemptionResponse,
 } from "@/src/types/city-wallet";
 
@@ -14,6 +17,20 @@ export async function generateOffer(
   return request("/offers/generate", {
     method: "POST",
     body: JSON.stringify(context),
+  });
+}
+
+export async function getMerchants(cityId: string): Promise<MerchantSummary[]> {
+  const params = new URLSearchParams({ cityId });
+  return request(`/merchants?${params.toString()}`);
+}
+
+export async function generateCoupon(
+  requestBody: GenerateCouponRequest,
+): Promise<GeneratedCouponResponse> {
+  return request("/coupons/generate", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
   });
 }
 

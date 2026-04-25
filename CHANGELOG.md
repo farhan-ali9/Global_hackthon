@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-04-26
+
+### Frontend app-wide context coupon loop
+- Added a City Wallet context engine that refreshes user context every 10
+  seconds with coordinates, current time, timezone, weather placeholder, intent
+  labels, and demand tags.
+- Added frontend API calls for `GET /merchants?cityId=...` and
+  `POST /coupons/generate`.
+- Added a local merchant recommender adapter for React Native AI/GGUF model
+  integration and wired the app root to select a merchant locally before coupon
+  generation.
+
 ## 2026-04-25
 
 ### Backend rebuilt around merchants + LLM coupon generation

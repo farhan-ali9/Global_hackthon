@@ -1,20 +1,131 @@
-import type { AnonymizedContextPayload } from "@/src/types/city-wallet";
+import * as Location from "expo-location";
+
+import type {
+  IntentLabel,
+  TimeOfDay,
+  UserContext,
+  WeatherBucket,
+  WeatherSituation,
+} from "@/src/types/city-wallet";
 
 export type ContextProvider = {
-  getAnonymizedContext: () => Promise<AnonymizedContextPayload>;
+  getUserContext: () => Promise<UserContext>;
 };
 
-// Context team: replace this with local-model anonymization of real context.
-export const mockContextProvider: ContextProvider = {
-  async getAnonymizedContext() {
+const DEFAULT_COORDINATES = {
+  latitude: 48.7784,
+  longitude: 9.1801,
+};
+
+const DEFAULT_CITY_ID = "stuttgart-demo";
+const DEFAULT_ZONE_ID = "old-town";
+
+export const deviceContextProvider: ContextProvider = {
+  async getUserContext() {
+    const now = new Date();
+    const location = await getCurrentLocation();
+    const coordinates = location?.coords ?? DEFAULT_COORDINATES;
+    const weather = getPlaceholderWeather(now);
+    const timeOfDay = getTimeOfDay(now);
+    const dayOfWeek = now.toLocaleDateString("en-US", { weekday: "long" });
+
     return {
-      cityId: "stuttgart-demo",
-      zoneId: "old-town",
-      timeOfDay: "lunch",
-      weatherBucket: "cold",
-      intentLabels: ["browsing", "seeking_warmth"],
+      cityId: DEFAULT_CITY_ID,
+      zoneId: DEFAULT_ZONE_ID,
+      coordinates,
+      coordinateAccuracyMeters: location?.coords.accuracy ?? undefined,
+      currentTimeIso: now.toISOString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+      locale: Intl.DateTimeFormat().resolvedOptions().locale ?? "en-US",
+      dayOfWeek,
+      isWeekend: dayOfWeek === "Saturday" || dayOfWeek === "Sunday",
+      timeOfDay,
+      weatherBucket: weather.bucket,
+      weather,
+      intentLabels: getIntentLabels(timeOfDay, weather.bucket),
       eventTags: [],
-      demandTags: ["quiet"],
+      demandTags: getDemandTags(timeOfDay),
+      mobilityState: "unknown",
+      privacyLevel: "device_precise",
     };
   },
 };
+
+export const mockContextProvider = deviceContextProvider;
+
+async function getCurrentLocation() {
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== "granted") return null;
+
+  try {
+    return await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function getTimeOfDay(date: Date): TimeOfDay {
+  const hour = date.getHours();
+  if (hour < 11) return "morning";
+  if (hour < 15) return "lunch";
+  if (hour < 18) return "afternoon";
+  return "evening";
+}
+
+function getPlaceholderWeather(date: Date): WeatherSituation {
+  const month = date.getMonth();
+  const hour = date.getHours();
+
+  if (month <= 1 || month === 11) {
+    return {
+      bucket: "cold",
+      label: "Cold city weather",
+      temperatureCelsius: 4,
+      precipitationProbability: 0.25,
+      source: "placeholder",
+    };
+  }
+
+  if (month >= 5 && month <= 7 && hour >= 11 && hour <= 17) {
+    return {
+      bucket: "hot",
+      label: "Warm and bright",
+      temperatureCelsius: 27,
+      precipitationProbability: 0.1,
+      source: "placeholder",
+    };
+  }
+
+  return {
+    bucket: "cloudy",
+    label: "Mild and cloudy",
+    temperatureCelsius: 14,
+    precipitationProbability: 0.2,
+    source: "placeholder",
+  };
+}
+
+function getIntentLabels(
+  timeOfDay: TimeOfDay,
+  weatherBucket: WeatherBucket,
+): IntentLabel[] {
+  const labels = new Set<IntentLabel>(["browsing"]);
+
+  if (timeOfDay === "lunch") labels.add("hungry");
+  if (weatherBucket === "cold" || weatherBucket === "rain") {
+    labels.add("seeking_warmth");
+  }
+  if (timeOfDay === "morning" || timeOfDay === "evening") {
+    labels.add("commuting");
+  }
+
+  return Array.from(labels);
+}
+
+function getDemandTags(timeOfDay: TimeOfDay) {
+  if (timeOfDay === "lunch") return ["lunch_window"];
+  if (timeOfDay === "evening") return ["after_work"];
+  return ["quiet"];
+}

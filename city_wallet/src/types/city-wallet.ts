@@ -78,6 +78,11 @@ export type Coupon = {
 
 export type TimeOfDay = "morning" | "lunch" | "afternoon" | "evening";
 export type WeatherBucket = "clear" | "cloudy" | "rain" | "cold" | "hot";
+export type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
 export type IntentLabel =
   | "browsing"
   | "hungry"
@@ -85,14 +90,67 @@ export type IntentLabel =
   | "commuting"
   | "social";
 
-export type AnonymizedContextPayload = {
+export type WeatherSituation = {
+  bucket: WeatherBucket;
+  label: string;
+  temperatureCelsius?: number;
+  precipitationProbability?: number;
+  source: "placeholder" | "device" | "weather_api";
+};
+
+export type UserContext = {
   cityId: string;
   zoneId: string;
+  coordinates: Coordinates;
+  coordinateAccuracyMeters?: number;
+  currentTimeIso: string;
+  timezone: string;
+  locale: string;
+  dayOfWeek: string;
+  isWeekend: boolean;
   timeOfDay: TimeOfDay;
   weatherBucket: WeatherBucket;
+  weather: WeatherSituation;
   intentLabels: IntentLabel[];
   eventTags: string[];
   demandTags: string[];
+  mobilityState: "stationary" | "walking" | "commuting" | "unknown";
+  privacyLevel: "device_precise";
+};
+
+export type AnonymizedContextPayload = UserContext;
+
+export type MerchantSummary = {
+  id: string;
+  description: string;
+  cityId: string;
+  coordinates: Coordinates;
+};
+
+export type LocalRecommendationRequest = {
+  context: UserContext;
+  merchants: MerchantSummary[];
+};
+
+export type LocalRecommendationResponse = {
+  merchantId: string;
+  confidence?: number;
+  reasoningTags?: string[];
+};
+
+export type GenerateCouponRequest = {
+  merchantId: string;
+  context: Record<string, unknown>;
+};
+
+export type GeneratedCouponResponse = {
+  merchantId: string;
+  headline: string;
+  body: string;
+  discountPercent: number;
+  ctaLabel: string;
+  expiresAt: string;
+  explanationTags: string[];
 };
 
 export type OfferUiSpec = {
