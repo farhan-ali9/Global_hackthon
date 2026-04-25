@@ -62,6 +62,9 @@ export const demoRedemption: Redemption = {
   status: "pending",
 };
 
+/** Clearbit logo CDN – returns square PNG by company domain (free tier). */
+const logo = (domain: string) => `https://logo.clearbit.com/${domain}`;
+
 export const COUPONS: Coupon[] = [
   {
     id: "mcdonalds-1",
@@ -263,3 +266,119 @@ export const REDEEMED_COUPONS: Coupon[] = [
     savings: "€ 12.00",
   },
 ];
+
+/* ──────────────────────────────────────────────────────────────────
+   MAP MERCHANTS  – each coupon's real-world pin for the map view.
+   Coordinates are real locations in Munich city centre.
+   ────────────────────────────────────────────────────────────────── */
+export type MapMerchant = {
+  id: string;
+  name: string;
+  category: string;
+  logoLetter: string;
+  logoUrl?: string;
+  brandColor: string;
+  accentColor: string;
+  offer: string;
+  latitude: number;
+  longitude: number;
+};
+
+export const MAP_MERCHANTS: MapMerchant[] = [
+  {
+    id: "mcdonalds",
+    name: "McDonald's",
+    category: "food",
+    logoLetter: "M",
+    logoUrl: logo("mcdonalds.com"),
+    brandColor: "#DA291C",
+    accentColor: "#FFC72C",
+    offer: "20% OFF",
+    latitude: 48.1366,
+    longitude: 11.5748,
+  },
+  {
+    id: "starbucks",
+    name: "Starbucks",
+    category: "food",
+    logoLetter: "S",
+    logoUrl: logo("starbucks.com"),
+    brandColor: "#00704A",
+    accentColor: "#CBA258",
+    offer: "Buy 1 Get 1",
+    latitude: 48.1373,
+    longitude: 11.5754,
+  },
+  {
+    id: "hm",
+    name: "H&M",
+    category: "retail",
+    logoLetter: "H",
+    logoUrl: logo("hm.com"),
+    brandColor: "#E50010",
+    accentColor: "#222222",
+    offer: "15% OFF",
+    latitude: 48.1378,
+    longitude: 11.5693,
+  },
+  {
+    id: "cinema",
+    name: "City Cinema",
+    category: "entertainment",
+    logoLetter: "C",
+    brandColor: "#1a1a2e",
+    accentColor: "#e94560",
+    offer: "€4 OFF",
+    latitude: 48.1356,
+    longitude: 11.5706,
+  },
+  {
+    id: "zara",
+    name: "Zara",
+    category: "retail",
+    logoLetter: "Z",
+    logoUrl: logo("zara.com"),
+    brandColor: "#212121",
+    accentColor: "#9E9E9E",
+    offer: "10% OFF",
+    latitude: 48.1382,
+    longitude: 11.5720,
+  },
+  {
+    id: "ikea",
+    name: "IKEA",
+    category: "retail",
+    logoLetter: "I",
+    logoUrl: logo("ikea.com"),
+    brandColor: "#0058A3",
+    accentColor: "#FFDA1A",
+    offer: "€10 OFF",
+    latitude: 48.1301,
+    longitude: 11.5822,
+  },
+  {
+    id: "bakery",
+    name: "Metro Bakery",
+    category: "food",
+    logoLetter: "B",
+    brandColor: "#7B4A1E",
+    accentColor: "#F4C87A",
+    offer: "2 FOR 1",
+    latitude: 48.1340,
+    longitude: 11.5775,
+  },
+  {
+    id: "fitness",
+    name: "FitCity Gym",
+    category: "wellness",
+    logoLetter: "F",
+    brandColor: "#0D47A1",
+    accentColor: "#42A5F5",
+    offer: "FREE DAY",
+    latitude: 48.1420,
+    longitude: 11.5660,
+  },
+];
+
+/** User's current (mock) location — Marienplatz, Munich */
+export const USER_LOCATION = { latitude: 48.1372, longitude: 11.5756 };

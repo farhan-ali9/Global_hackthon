@@ -2,6 +2,7 @@ import { useRouter, type Href } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { MapPreviewCard } from "@/src/components/MapPreviewCard";
 import { COUPONS, REDEEMED_COUPONS } from "@/src/data/mockData";
 import type { Coupon } from "@/src/types/city-wallet";
 import { CW, fontFamily } from "@/src/theme/tokens";
@@ -98,6 +99,9 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
+
+        {/* ── Map preview ── */}
+        <MapPreviewCard />
 
         {/* ── Recent section ── */}
         <View style={styles.sectionHeader}>
