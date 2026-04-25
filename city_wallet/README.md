@@ -1,25 +1,17 @@
 # City Wallet App
 
-Custom Expo dev-build mobile app for the City Wallet demo. The app prepares an
-on-device Llama model, fetches backend merchant candidates, ranks them locally,
-sends only the selected merchant id and coarse intent to the backend, shows the
-returned GenUI offer payload, accepts the offer, and displays a redemption
-token.
+Expo Go-compatible mobile app for the City Wallet demo. The app collects
+device-side context, ranks nearby merchants locally, and asks the backend to
+generate a coupon for the selected merchant.
 
 ## Running Locally
 
 ```bash
 npm install
-npm run ios
-```
-
-Use `npm run android` for Android. After creating a dev client, use:
-
-```bash
 npm start
 ```
 
-Expo Go is not sufficient because the Llama provider depends on native modules.
+Open the project with Expo Go from the Metro output.
 
 ## Environment
 
@@ -33,11 +25,9 @@ Default:
 
 ```bash
 EXPO_PUBLIC_API_BASE_URL=http://localhost:4000
-EXPO_PUBLIC_DEFAULT_CITY_ID=stuttgart-demo
-EXPO_PUBLIC_ON_DEVICE_MODEL_ID=Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf
 ```
 
-For a physical device, use your computer's LAN IP:
+For Expo Go on a physical device, use your computer's LAN IP:
 
 ```bash
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
@@ -45,28 +35,45 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
 
 ## Structure
 
-- `app/index.tsx` - Controls model download/prepare, candidate loading, local
-  ranking, and selected-offer generation.
+- `app/_layout.tsx` - Starts the app-wide user-context coupon loop.
+- `app/index.tsx` - Onboarding entry point for the wallet demo.
 - `app/offers/[id].tsx` - Plain offer detail and accept action.
 - `app/redeem/[id].tsx` - Plain redemption token/status screen.
-- `src/ai/` - On-device Llama lifecycle, structured intent extraction, and
-  local ranking pipeline.
-- `src/context-engine/ContextProvider.ts` - Boundary for future private local
-  signal capture.
+- `src/context-engine/ContextProvider.ts` - Device context provider for
+  location, time, weather placeholder, and derived intent signals.
+- `src/context-engine/LocalMerchantRecommender.ts` - Adapter boundary for the
+  React Native AI/GGUF merchant-selection model.
+- `src/context-engine/UserContextLoopProvider.tsx` - App-wide 10-second loop
+  that refreshes context, fetches merchants, asks the local model to choose a
+  merchant, and requests backend coupon generation.
 - `src/lib/api.ts` - Backend API client.
 - `src/lib/demoState.ts` - In-memory handoff between demo screens.
 - `src/types/city-wallet.ts` - API contracts shared by the mobile app.
+
+## Context Coupon Loop
+
+The root layout wraps the app in `UserContextLoopProvider`. On mount, and then
+every 10 seconds, the provider:
+
+1. Builds a `UserContext` with precise coordinates, local time, timezone,
+   weather bucket/details, intent labels, and demand tags.
+2. Calls `GET /merchants?cityId=<id>` to retrieve merchant candidates for the
+   user's broad city.
+3. Calls `recommendMerchant({ context, merchants })` in
+   `LocalMerchantRecommender.ts`. Register the React Native AI/GGUF
+   implementation with `setLocalMerchantModelClient(...)`.
+4. Calls `POST /coupons/generate` with the selected `merchantId` and a reduced
+   context payload. Precise coordinates stay on device for local ranking.
 
 ## How to Work With It
 
 - Keep UI minimal until the backend/context path is stable.
 - Backend work happens in `../backend/`; the app only calls the API.
-- Context work should provide private local signals to
-  `src/ai/onDeviceLlamaPipeline.ts`.
-- AI work on-device should output `OfferIntent` and a selected merchant id.
-- Do not add raw private context to backend requests.
-- Backend generation returns safe typed GenUI JSON, not remote executable UI
-  code.
+- Context work should replace the placeholder weather provider with a real local
+  or API-backed weather source.
+- AI work on-device should implement the `LocalMerchantModelClient` contract and
+  return a merchant id from the candidate list.
+- Backend generation returns typed coupon JSON, not remote executable UI code.
 
 ## Checks
 
@@ -77,5 +84,5 @@ npx tsc --noEmit
 
 ## Current Scope
 
-This scaffold does not yet implement real context-signal capture, model
-fine-tuning, bundled model files, push notifications, or QR rendering.
+This scaffold does not yet implement real context signals, push notifications,
+QR rendering, or React Native AI native modules.

@@ -1,301 +1,328 @@
-import { Link, type Href } from "expo-router";
-import { useEffect, useState } from "react";
+import { useRouter, type Href } from "expo-router";
 import {
-  Button,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  getOnDeviceLlamaModelManager,
-  type LocalRankingPipelineResult,
-  type OnDeviceModelStatus,
-} from "@/src/ai/onDeviceLlamaPipeline";
-import { generateOffer, getMerchantCandidates } from "@/src/lib/api";
-import { setLatestOffer } from "@/src/lib/demoState";
-import type {
-  GeneratedOfferResponse,
-  MerchantCandidate,
-} from "@/src/types/city-wallet";
+import { CW, fontFamily } from "@/src/theme/tokens";
 
-const defaultCityId =
-  process.env.EXPO_PUBLIC_DEFAULT_CITY_ID ?? "stuttgart-demo";
+const AVATAR_COLORS = ["#c5a880", "#a8c5da", "#b5c5a8", "#d4a8c5"];
 
-const modelManager = getOnDeviceLlamaModelManager();
-
-export default function Index() {
-  const [modelStatus, setModelStatus] = useState<OnDeviceModelStatus>(
-    modelManager.modelStatus,
-  );
-  const [cityId, setCityId] = useState(defaultCityId);
-  const [zoneId, setZoneId] = useState("");
-  const [localSignalSummary, setLocalSignalSummary] = useState("");
-  const [candidates, setCandidates] = useState<MerchantCandidate[]>([]);
-  const [ranking, setRanking] = useState<LocalRankingPipelineResult | null>(null);
-  const [offer, setOffer] = useState<GeneratedOfferResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-
-  useEffect(() => {
-    void refreshModelStatus();
-  }, []);
-
-  async function refreshModelStatus() {
-    setModelStatus(await modelManager.refreshStatus());
-  }
-
-  async function runAction(actionName: string, action: () => Promise<void>) {
-    setBusyAction(actionName);
-    setError(null);
-
-    try {
-      await action();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Action failed");
-    } finally {
-      setBusyAction(null);
-    }
-  }
-
-  async function handleDownloadModel() {
-    await runAction("download", async () => {
-      const status = await modelManager.downloadModel(setModelStatus);
-      setModelStatus(status);
-    });
-  }
-
-  async function handlePrepareModel() {
-    await runAction("prepare", async () => {
-      setModelStatus(await modelManager.prepareModel());
-    });
-  }
-
-  async function handleUnloadModel() {
-    await runAction("unload", async () => {
-      setModelStatus(await modelManager.unloadModel());
-    });
-  }
-
-  async function handleLoadCandidates() {
-    await runAction("load-candidates", async () => {
-      const response = await getMerchantCandidates(cityId.trim());
-      setCandidates(response.candidates);
-      setRanking(null);
-      setOffer(null);
-    });
-  }
-
-  async function handleRunLocalRanking() {
-    await runAction("rank", async () => {
-      if (!cityId.trim()) {
-        throw new Error("Set a city id before running ranking.");
-      }
-
-      if (!localSignalSummary.trim()) {
-        throw new Error("Connect or enter local signals before running ranking.");
-      }
-
-      const result = await modelManager.rankMerchantCandidates({
-        localSignals: {
-          cityId: cityId.trim(),
-          zoneId: zoneId.trim() || undefined,
-          localSignalSummary: localSignalSummary.trim(),
-          capturedAt: new Date().toISOString(),
-        },
-        candidates,
-      });
-      setRanking(result);
-      setOffer(null);
-    });
-  }
-
-  async function handleGenerateOffer() {
-    await runAction("generate-offer", async () => {
-      if (!ranking) {
-        throw new Error("Run local ranking before generating an offer.");
-      }
-
-      const generatedOffer = await generateOffer(ranking.selectedOfferRequest);
-      setLatestOffer(generatedOffer);
-      setOffer(generatedOffer);
-    });
-  }
+export default function Onboarding() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>City Wallet</Text>
+    <View style={[styles.root, { paddingBottom: insets.bottom }]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* Hero area */}
+        <View style={styles.hero}>
+          <View style={styles.heroBg}>
+            <View style={styles.heroBgCircle1} />
+            <View style={styles.heroBgCircle2} />
+            <View style={styles.heroBgGrid}>
+              {Array.from({ length: 20 }).map((_, i) => (
+                <View key={i} style={styles.heroDot} />
+              ))}
+            </View>
+          </View>
 
-      <View style={styles.panel}>
-        <Text style={styles.sectionTitle}>Model</Text>
-        <Text selectable style={styles.code}>
-          {JSON.stringify(modelStatus, null, 2)}
-        </Text>
-        <View style={styles.buttonRow}>
-          <Button title="Refresh" onPress={refreshModelStatus} />
-          <Button
-            title={busyAction === "download" ? "Downloading..." : "Download"}
-            onPress={handleDownloadModel}
-            disabled={busyAction !== null}
-          />
+          {/* Brand chip */}
+          <View style={styles.brandChip}>
+            <Text style={styles.brandChipText}>City Wallet</Text>
+          </View>
+
+          {/* Hero illustration */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroCardInner}>
+              <Text style={styles.heroCardLabel}>CITY BALANCE</Text>
+              <Text style={styles.heroCardAmount}>€ 284.50</Text>
+              <View style={styles.heroCardRow}>
+                <View style={styles.heroSubCard}>
+                  <Text style={styles.heroSubLabel}>Transit</Text>
+                  <Text style={styles.heroSubValue}>€ 40 left</Text>
+                </View>
+                <View style={styles.heroSubCard}>
+                  <Text style={styles.heroSubLabel}>City Tax</Text>
+                  <Text style={styles.heroSubValue}>Paid ✓</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* gradient fade */}
+          <View style={styles.heroFade} />
         </View>
-        <View style={styles.buttonRow}>
-          <Button
-            title={busyAction === "prepare" ? "Preparing..." : "Prepare"}
-            onPress={handlePrepareModel}
-            disabled={busyAction !== null || !modelStatus.isDownloaded}
-          />
-          <Button
-            title="Unload"
-            onPress={handleUnloadModel}
-            disabled={busyAction !== null || !modelStatus.isPrepared}
-          />
-        </View>
-      </View>
 
-      <View style={styles.panel}>
-        <Text style={styles.sectionTitle}>Local inputs</Text>
-        <TextInput
-          value={cityId}
-          onChangeText={setCityId}
-          autoCapitalize="none"
-          style={styles.input}
-          placeholder="stuttgart-demo"
-        />
-        <TextInput
-          value={zoneId}
-          onChangeText={setZoneId}
-          autoCapitalize="none"
-          style={styles.input}
-          placeholder="old-town"
-        />
-        <TextInput
-          value={localSignalSummary}
-          onChangeText={setLocalSignalSummary}
-          multiline
-          style={[styles.input, styles.multilineInput]}
-          placeholder="It is lunch, cold outside, I am walking near old-town, browsing shops, and would prefer a warm quiet cafe nearby."
-        />
-      </View>
-
-      <View style={styles.panel}>
-        <Text style={styles.sectionTitle}>Merchant candidates</Text>
-        <Button
-          title={
-            busyAction === "load-candidates"
-              ? "Loading..."
-              : "Load candidates"
-          }
-          onPress={handleLoadCandidates}
-          disabled={busyAction !== null || !cityId.trim()}
-        />
-        <Text selectable style={styles.code}>
-          {candidates.length > 0
-            ? JSON.stringify(candidates, null, 2)
-            : "No candidates loaded"}
-        </Text>
-      </View>
-
-      <View style={styles.panel}>
-        <Text style={styles.sectionTitle}>Local ranking</Text>
-        <Button
-          title={busyAction === "rank" ? "Ranking..." : "Run local ranking"}
-          onPress={handleRunLocalRanking}
-          disabled={
-            busyAction !== null ||
-            !modelStatus.isPrepared ||
-            candidates.length === 0
-          }
-        />
-        <Text selectable style={styles.code}>
-          {ranking ? JSON.stringify(ranking, null, 2) : "No ranking yet"}
-        </Text>
-      </View>
-
-      <Button
-        title={
-          busyAction === "generate-offer"
-            ? "Generating..."
-            : "Generate selected offer"
-        }
-        onPress={handleGenerateOffer}
-        disabled={busyAction !== null || !ranking}
-      />
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      {offer ? (
-        <View style={styles.panel}>
-          <Text style={styles.sectionTitle}>Returned offer</Text>
-          <Text style={styles.body}>
-            {offer.ui.headline} · {offer.offer.discountPercent}% off at{" "}
-            {offer.offer.merchant.name}
+        {/* Content */}
+        <View style={styles.content}>
+          <View style={styles.headline}>
+            <Text style={styles.titleMain}>Smart </Text>
+            <Text style={[styles.titleMain, styles.titleItalic]}>city</Text>
+            <Text style={styles.titleMain}>{"\n"}in your pocket</Text>
+          </View>
+          <Text style={styles.subtitle}>
+            Manage transit, pay city services, and access your civic ID — all
+            from one wallet.
           </Text>
-          <Text selectable style={styles.code}>
-            {JSON.stringify(offer.ui, null, 2)}
-          </Text>
-          <Link href={`/offers/${offer.offer.id}` as Href} style={styles.link}>
-            Open offer
-          </Link>
+
+          {/* Email input row */}
+          <View style={styles.inputRow}>
+            <TextInput
+              placeholder="Enter your email"
+              placeholderTextColor={CW.soft}
+              style={styles.input}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <Pressable
+              style={({ pressed }) => [styles.getStartedBtn, pressed && styles.pressed]}
+              onPress={() => router.replace("/(tabs)" as Href)}
+            >
+              <Text style={styles.getStartedText}>Get Started</Text>
+            </Pressable>
+          </View>
+
+          {/* Social proof */}
+          <View style={styles.social}>
+            <View style={styles.avatarStack}>
+              {AVATAR_COLORS.map((c, i) => (
+                <View
+                  key={i}
+                  style={[styles.avatar, { backgroundColor: c, marginLeft: i > 0 ? -8 : 0 }]}
+                />
+              ))}
+            </View>
+            <View>
+              <View style={styles.stars}>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <Text key={i} style={styles.star}>★</Text>
+                ))}
+              </View>
+              <Text style={styles.reviews}>1,020+ Reviews</Text>
+            </View>
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [styles.ghostBtn, pressed && styles.pressed]}
+            onPress={() => router.replace("/(tabs)" as Href)}
+          >
+            <Text style={styles.ghostBtnText}>Sign in with existing account</Text>
+          </Pressable>
         </View>
-      ) : null}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: 16,
-    padding: 20,
-    paddingBottom: 40,
+  root: { flex: 1, backgroundColor: CW.bg },
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
+
+  /* hero */
+  hero: {
+    height: 300,
+    overflow: "hidden",
+    position: "relative",
+    backgroundColor: "#f0f0f8",
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
+  heroBg: { position: "absolute", inset: 0 } as never,
+  heroBgCircle1: {
+    position: "absolute",
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: "rgba(100,130,200,0.12)",
+    top: -60,
+    right: -40,
   },
-  panel: {
-    gap: 8,
-    padding: 12,
-    backgroundColor: "#FFFFFF",
-    borderColor: "#DDDDDD",
-    borderWidth: 1,
+  heroBgCircle2: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: "rgba(197,168,128,0.15)",
+    bottom: -30,
+    left: 20,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  body: {
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  buttonRow: {
+  heroBgGrid: {
+    position: "absolute",
+    inset: 0,
     flexDirection: "row",
-    gap: 12,
+    flexWrap: "wrap",
+    padding: 20,
+    gap: 30,
+    opacity: 0.4,
+  } as never,
+  heroDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: "rgba(55,58,70,0.2)" },
+  heroFade: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    backgroundColor: "transparent",
+  },
+
+  brandChip: {
+    position: "absolute",
+    top: 16,
+    alignSelf: "center",
+    backgroundColor: "rgba(255,255,255,0.82)",
+    borderRadius: 40,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: CW.border,
+    zIndex: 2,
+  },
+  brandChipText: {
+    fontSize: 11,
+    fontWeight: "500",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    color: CW.mid,
+    fontFamily: fontFamily.semibold,
+  },
+
+  heroCard: {
+    position: "absolute",
+    bottom: 24,
+    left: 22,
+    right: 22,
+    zIndex: 2,
+  },
+  heroCardInner: {
+    backgroundColor: "#1a1a1c",
+    borderRadius: 20,
+    padding: 20,
+    overflow: "hidden",
+  },
+  heroCardLabel: {
+    fontSize: 9,
+    letterSpacing: 1.5,
+    color: "rgba(255,255,255,0.45)",
+    textTransform: "uppercase",
+    fontFamily: fontFamily.semibold,
+  },
+  heroCardAmount: {
+    fontSize: 32,
+    fontWeight: "300",
+    color: "#fff",
+    letterSpacing: -1,
+    marginTop: 4,
+    fontFamily: fontFamily.regular,
+  },
+  heroCardRow: { flexDirection: "row", gap: 10, marginTop: 12 },
+  heroSubCard: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 10,
+    padding: 10,
+  },
+  heroSubLabel: {
+    fontSize: 9,
+    color: "rgba(255,255,255,0.4)",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    fontFamily: fontFamily.semibold,
+  },
+  heroSubValue: { fontSize: 13, fontWeight: "500", color: "#fff", marginTop: 2, fontFamily: fontFamily.medium },
+
+  /* content */
+  content: { flex: 1, padding: 26, paddingTop: 20, gap: 16 },
+
+  headline: { flexDirection: "row", flexWrap: "wrap" },
+  titleMain: {
+    fontFamily: fontFamily.medium,
+    fontWeight: "500",
+    fontSize: 34,
+    letterSpacing: -1.4,
+    color: CW.text,
+    lineHeight: 40,
+  },
+  titleItalic: { fontStyle: "italic", fontSize: 40 },
+
+  subtitle: {
+    fontSize: 14,
+    color: CW.mid,
+    lineHeight: 22,
+    opacity: 0.82,
+    fontFamily: fontFamily.regular,
+  },
+
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: CW.bg,
+    borderRadius: CW.pill,
+    borderWidth: 1,
+    borderColor: CW.border,
+    paddingLeft: 18,
+    paddingRight: 5,
+    paddingVertical: 5,
+    gap: 8,
+    ...({
+      shadowColor: "#c2c2c2",
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.25,
+      shadowRadius: 40,
+      elevation: 8,
+    } as object),
   },
   input: {
-    borderColor: "#CFCFCF",
-    borderWidth: 1,
-    fontSize: 15,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    flex: 1,
+    fontSize: 13,
+    color: CW.text,
+    fontFamily: fontFamily.regular,
+    height: 40,
   },
-  multilineInput: {
-    minHeight: 84,
-    textAlignVertical: "top",
+  getStartedBtn: {
+    backgroundColor: "#1a1a1c",
+    borderRadius: CW.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
-  code: {
-    fontFamily: "Courier",
+  getStartedText: {
+    color: "#fff",
     fontSize: 12,
-    lineHeight: 17,
+    fontWeight: "500",
+    fontFamily: fontFamily.medium,
+    whiteSpace: "nowrap",
+  } as never,
+
+  social: { flexDirection: "row", alignItems: "center", gap: 10 },
+  avatarStack: { flexDirection: "row" },
+  avatar: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: "#fff" },
+  stars: { flexDirection: "row", gap: 1 },
+  star: { fontSize: 10, color: "#f59e0b" },
+  reviews: { fontSize: 11, color: CW.soft, fontFamily: fontFamily.regular },
+
+  ghostBtn: {
+    borderRadius: CW.pill,
+    borderWidth: 1.5,
+    borderColor: CW.border,
+    paddingVertical: 14,
+    alignItems: "center",
+    backgroundColor: CW.bg,
   },
-  error: {
-    color: "#B00020",
-  },
-  link: {
-    color: "#0057CC",
+  ghostBtnText: {
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "500",
+    color: CW.text,
+    fontFamily: fontFamily.medium,
   },
+
+  pressed: { opacity: 0.7 },
 });

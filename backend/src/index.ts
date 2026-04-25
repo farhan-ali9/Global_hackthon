@@ -3,10 +3,19 @@ import dotenv from "dotenv";
 import express from "express";
 import { ZodError } from "zod";
 
+import { createLlmCouponGenerator } from "./coupons/llmCouponGenerator";
 import { prisma } from "./db";
 import { createDeterministicOfferGenerator } from "./generator/deterministicOfferGenerator";
-import { selectedOfferRequestSchema } from "./schemas";
-import type { MerchantCandidate, RedemptionResponse } from "./types";
+import {
+  couponRequestSchema,
+  merchantListQuerySchema,
+  selectedOfferRequestSchema,
+} from "./schemas";
+import type {
+  MerchantCandidate,
+  MerchantSummary,
+  RedemptionResponse,
+} from "./types";
 
 dotenv.config({ quiet: true });
 
@@ -14,6 +23,11 @@ const app = express();
 const port = Number(process.env.PORT ?? 4000);
 const corsOrigin = process.env.CORS_ORIGIN ?? "*";
 const offerGenerator = createDeterministicOfferGenerator(prisma);
+
+const couponGenerator = createLlmCouponGenerator(prisma, {
+  apiKey: process.env.OPENROUTER_API_KEY ?? "",
+  model: process.env.OPENROUTER_MODEL ?? "anthropic/claude-haiku-4-5",
+});
 
 app.use(
   cors({
@@ -27,6 +41,30 @@ app.use(express.json());
 
 app.get("/health", (_request, response) => {
   response.json({ ok: true });
+});
+
+app.get("/merchants", async (request, response, next) => {
+  try {
+    const { cityId } = merchantListQuerySchema.parse(request.query);
+    const merchants = await prisma.merchant.findMany({
+      where: cityId ? { cityId } : undefined,
+      orderBy: { id: "asc" },
+    });
+
+    const summaries: MerchantSummary[] = merchants.map((merchant) => ({
+      id: merchant.id,
+      description: merchant.name,
+      cityId: merchant.cityId,
+      coordinates: {
+        latitude: 0,
+        longitude: 0,
+      },
+    }));
+
+    response.json(summaries);
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/merchants/candidates", async (request, response, next) => {
@@ -71,6 +109,16 @@ app.post("/offers/generate", async (request, response, next) => {
     const generatedOffer = await offerGenerator.generateOffer(selectedOfferRequest);
 
     response.status(201).json(generatedOffer);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/coupons/generate", async (request, response, next) => {
+  try {
+    const couponRequest = couponRequestSchema.parse(request.body);
+    const coupon = await couponGenerator.generate(couponRequest);
+    response.status(201).json(coupon);
   } catch (error) {
     next(error);
   }
@@ -194,7 +242,7 @@ app.use(
     if (error instanceof ZodError) {
       response
         .status(400)
-        .json({ error: "Invalid request body", details: error.flatten() });
+        .json({ error: "Invalid request", details: error.flatten() });
       return;
     }
 
@@ -207,7 +255,12 @@ app.use(
         : 500;
 
     console.error(error);
-    response.status(statusCode).json({ error: "Internal server error" });
+    response.status(statusCode).json({
+      error:
+        statusCode === 500
+          ? "Internal server error"
+          : (error as Error).message,
+    });
   },
 );
 
