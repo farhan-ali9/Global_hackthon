@@ -1,17 +1,25 @@
 # City Wallet App
 
-Expo Go-compatible mobile app for the City Wallet demo. The app sends
-anonymized context to the backend, shows the returned GenUI offer payload,
-accepts the offer, and displays a redemption token.
+Custom Expo dev-build mobile app for the City Wallet demo. The app prepares an
+on-device Llama model, fetches backend merchant candidates, ranks them locally,
+sends only the selected merchant id and coarse intent to the backend, shows the
+returned GenUI offer payload, accepts the offer, and displays a redemption
+token.
 
 ## Running Locally
 
 ```bash
 npm install
+npm run ios
+```
+
+Use `npm run android` for Android. After creating a dev client, use:
+
+```bash
 npm start
 ```
 
-Open the project with Expo Go from the Metro output.
+Expo Go is not sufficient because the Llama provider depends on native modules.
 
 ## Environment
 
@@ -25,9 +33,11 @@ Default:
 
 ```bash
 EXPO_PUBLIC_API_BASE_URL=http://localhost:4000
+EXPO_PUBLIC_DEFAULT_CITY_ID=stuttgart-demo
+EXPO_PUBLIC_ON_DEVICE_MODEL_ID=Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf
 ```
 
-For Expo Go on a physical device, use your computer's LAN IP:
+For a physical device, use your computer's LAN IP:
 
 ```bash
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
@@ -35,11 +45,14 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
 
 ## Structure
 
-- `app/index.tsx` - Sends anonymized context and shows returned GenUI JSON.
+- `app/index.tsx` - Controls model download/prepare, candidate loading, local
+  ranking, and selected-offer generation.
 - `app/offers/[id].tsx` - Plain offer detail and accept action.
 - `app/redeem/[id].tsx` - Plain redemption token/status screen.
-- `src/context-engine/ContextProvider.ts` - Mock local anonymized-context
-  provider.
+- `src/ai/` - On-device Llama lifecycle, structured intent extraction, and
+  local ranking pipeline.
+- `src/context-engine/ContextProvider.ts` - Boundary for future private local
+  signal capture.
 - `src/lib/api.ts` - Backend API client.
 - `src/lib/demoState.ts` - In-memory handoff between demo screens.
 - `src/types/city-wallet.ts` - API contracts shared by the mobile app.
@@ -48,9 +61,10 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
 
 - Keep UI minimal until the backend/context path is stable.
 - Backend work happens in `../backend/`; the app only calls the API.
-- Context work should replace `mockContextProvider` with location, weather,
-  events, demand signals, and local-model anonymization.
-- AI work on-device should output `AnonymizedContextPayload`.
+- Context work should provide private local signals to
+  `src/ai/onDeviceLlamaPipeline.ts`.
+- AI work on-device should output `OfferIntent` and a selected merchant id.
+- Do not add raw private context to backend requests.
 - Backend generation returns safe typed GenUI JSON, not remote executable UI
   code.
 
@@ -63,5 +77,5 @@ npx tsc --noEmit
 
 ## Current Scope
 
-This scaffold does not yet implement real context signals, push notifications,
-QR rendering, or React Native AI native modules.
+This scaffold does not yet implement real context-signal capture, model
+fine-tuning, bundled model files, push notifications, or QR rendering.

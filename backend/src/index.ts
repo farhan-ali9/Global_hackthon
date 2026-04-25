@@ -5,8 +5,8 @@ import { ZodError } from "zod";
 
 import { prisma } from "./db";
 import { createDeterministicOfferGenerator } from "./generator/deterministicOfferGenerator";
-import { anonymizedContextSchema } from "./schemas";
-import type { RedemptionResponse } from "./types";
+import { selectedOfferRequestSchema } from "./schemas";
+import type { MerchantCandidate, RedemptionResponse } from "./types";
 
 dotenv.config({ quiet: true });
 
@@ -29,10 +29,46 @@ app.get("/health", (_request, response) => {
   response.json({ ok: true });
 });
 
+app.get("/merchants/candidates", async (request, response, next) => {
+  try {
+    const cityId = String(request.query.cityId ?? "").trim();
+
+    if (!cityId) {
+      response.status(400).json({ error: "cityId is required" });
+      return;
+    }
+
+    const merchants = await prisma.merchant.findMany({
+      where: {
+        active: true,
+        cityId,
+      },
+      orderBy: {
+        distanceMeters: "asc",
+      },
+      include: {
+        rule: true,
+        demandSignals: {
+          orderBy: {
+            observedAt: "desc",
+          },
+          take: 1,
+        },
+      },
+    });
+
+    response.json({
+      candidates: merchants.map(toMerchantCandidate),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/offers/generate", async (request, response, next) => {
   try {
-    const context = anonymizedContextSchema.parse(request.body);
-    const generatedOffer = await offerGenerator.generateOffer(context);
+    const selectedOfferRequest = selectedOfferRequestSchema.parse(request.body);
+    const generatedOffer = await offerGenerator.generateOffer(selectedOfferRequest);
 
     response.status(201).json(generatedOffer);
   } catch (error) {
@@ -178,6 +214,50 @@ app.use(
 app.listen(port, () => {
   console.log(`City Wallet API listening on port ${port}`);
 });
+
+function toMerchantCandidate(merchant: {
+  id: string;
+  name: string;
+  category: "CAFE" | "RESTAURANT" | "RETAIL" | "CULTURE";
+  cityId: string;
+  zoneId: string;
+  distanceMeters: number;
+  rule: {
+    maxDiscountPercent: number;
+    quietHours: string;
+  } | null;
+  demandSignals: {
+    state: "QUIET" | "NORMAL" | "BUSY";
+    score: number;
+    observedAt: Date;
+  }[];
+}): MerchantCandidate {
+  const latestDemand = merchant.demandSignals[0];
+
+  return {
+    id: merchant.id,
+    name: merchant.name,
+    category: merchant.category.toLowerCase() as MerchantCandidate["category"],
+    cityId: merchant.cityId,
+    zoneId: merchant.zoneId,
+    distanceMeters: merchant.distanceMeters,
+    rule: merchant.rule
+      ? {
+          maxDiscountPercent: merchant.rule.maxDiscountPercent,
+          quietHours: merchant.rule.quietHours,
+        }
+      : null,
+    demand: latestDemand
+      ? {
+          state: latestDemand.state.toLowerCase() as NonNullable<
+            MerchantCandidate["demand"]
+          >["state"],
+          score: latestDemand.score,
+          observedAt: latestDemand.observedAt.toISOString(),
+        }
+      : null,
+  };
+}
 
 async function createUniqueToken() {
   for (let attempt = 0; attempt < 5; attempt += 1) {

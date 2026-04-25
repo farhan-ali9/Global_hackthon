@@ -1,8 +1,8 @@
 # City Wallet Backend
 
-Small TypeScript API for the City Wallet demo. It receives anonymized context
-from the mobile app, selects a merchant from Postgres, creates a deterministic
-GenUI offer payload, and manages redemption tokens.
+Small TypeScript API for the City Wallet demo. It returns safe merchant
+candidate metadata, receives a locally selected merchant id plus coarse intent,
+creates a deterministic GenUI offer payload, and manages redemption tokens.
 
 ## Setup
 
@@ -41,10 +41,27 @@ The API runs on `http://localhost:4000` by default.
 ## Endpoints
 
 - `GET /health`
+- `GET /merchants/candidates?cityId=stuttgart-demo`
 - `POST /offers/generate`
 - `POST /offers/:offerId/accept`
 - `GET /redemptions/:token`
 - `POST /redemptions/:token/validate`
+
+`POST /offers/generate` expects:
+
+```json
+{
+  "merchantId": "merchant-cafe-mueller",
+  "intent": {
+    "cityId": "stuttgart-demo",
+    "timeOfDay": "lunch",
+    "weatherBucket": "cold",
+    "intentLabels": ["browsing"],
+    "eventTags": [],
+    "demandTags": []
+  }
+}
+```
 
 ## DigitalOcean Notes
 

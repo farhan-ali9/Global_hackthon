@@ -1,18 +1,16 @@
-import { DemandState, MerchantCategory, Prisma, type PrismaClient } from "@prisma/client";
+import { DemandState, Prisma, type PrismaClient } from "@prisma/client";
 
 import type {
-  AnonymizedContextPayload,
   GeneratedOfferResponse,
   OfferUiSpec,
+  SelectedOfferRequest,
 } from "../types";
 
-type MerchantCandidate = Awaited<
-  ReturnType<typeof loadMerchantCandidates>
->[number];
+type MerchantWithMetadata = NonNullable<Awaited<ReturnType<typeof loadMerchant>>>;
 
 export type OfferGenerator = {
   generateOffer: (
-    context: AnonymizedContextPayload,
+    request: SelectedOfferRequest,
   ) => Promise<GeneratedOfferResponse>;
 };
 
@@ -20,37 +18,41 @@ export function createDeterministicOfferGenerator(
   prisma: PrismaClient,
 ): OfferGenerator {
   return {
-    async generateOffer(context) {
-      const candidates = await loadMerchantCandidates(prisma, context.cityId);
+    async generateOffer(request) {
+      const selected = await loadMerchant(
+        prisma,
+        request.merchantId,
+        request.intent.cityId,
+      );
 
-      if (candidates.length === 0) {
-        throw Object.assign(new Error("No active merchants available"), {
+      if (!selected) {
+        throw Object.assign(new Error("Merchant is not available"), {
           statusCode: 404,
         });
       }
 
-      const ranked = candidates
-        .map((merchant) => ({
-          merchant,
-          score: scoreMerchant(merchant, context),
-        }))
-        .sort((left, right) => right.score - left.score);
-
-      const selected = ranked[0].merchant;
       const demandState = selected.demandSignals[0]?.state ?? DemandState.NORMAL;
       const discountPercent = chooseDiscount(
         selected.rule?.maxDiscountPercent ?? 10,
         demandState,
-        context,
+        request.intent,
       );
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-      const explanationTags = buildExplanationTags(selected, demandState, context);
-      const ui = buildUiSpec(selected, discountPercent, context, explanationTags);
+      const explanationTags = buildExplanationTags(
+        demandState,
+        request.intent,
+      );
+      const ui = buildUiSpec(
+        selected,
+        discountPercent,
+        request.intent,
+        explanationTags,
+      );
 
       const offer = await prisma.offer.create({
         data: {
           merchantId: selected.id,
-          anonymizedContext: context as Prisma.InputJsonValue,
+          intent: request.intent as Prisma.InputJsonValue,
           uiSpec: ui as Prisma.InputJsonValue,
           discountPercent,
           expiresAt,
@@ -80,9 +82,14 @@ export function createDeterministicOfferGenerator(
   };
 }
 
-async function loadMerchantCandidates(prisma: PrismaClient, cityId: string) {
-  return prisma.merchant.findMany({
+async function loadMerchant(
+  prisma: PrismaClient,
+  merchantId: string,
+  cityId: string,
+) {
+  return prisma.merchant.findFirst({
     where: {
+      id: merchantId,
       active: true,
       cityId,
     },
@@ -98,51 +105,10 @@ async function loadMerchantCandidates(prisma: PrismaClient, cityId: string) {
   });
 }
 
-function scoreMerchant(
-  merchant: MerchantCandidate,
-  context: AnonymizedContextPayload,
-) {
-  let score = 0;
-  const demandState = merchant.demandSignals[0]?.state ?? DemandState.NORMAL;
-
-  if (merchant.zoneId === context.zoneId) score += 25;
-  if (demandState === DemandState.QUIET) score += 30;
-  if (demandState === DemandState.NORMAL) score += 10;
-  if (demandState === DemandState.BUSY) score -= 30;
-
-  if (
-    merchant.category === MerchantCategory.CAFE &&
-    (context.intentLabels.includes("seeking_warmth") ||
-      context.weatherBucket === "cold" ||
-      context.weatherBucket === "rain")
-  ) {
-    score += 25;
-  }
-
-  if (
-    (merchant.category === MerchantCategory.CAFE ||
-      merchant.category === MerchantCategory.RESTAURANT) &&
-    (context.intentLabels.includes("hungry") || context.timeOfDay === "lunch")
-  ) {
-    score += 20;
-  }
-
-  if (
-    merchant.category === MerchantCategory.RETAIL &&
-    context.intentLabels.includes("browsing")
-  ) {
-    score += 15;
-  }
-
-  if (context.demandTags.includes("quiet")) score += 10;
-
-  return score;
-}
-
 function chooseDiscount(
   maxDiscountPercent: number,
   demandState: DemandState,
-  context: AnonymizedContextPayload,
+  context: SelectedOfferRequest["intent"],
 ) {
   const baseDiscount =
     demandState === DemandState.QUIET
@@ -157,22 +123,20 @@ function chooseDiscount(
 }
 
 function buildExplanationTags(
-  merchant: MerchantCandidate,
   demandState: DemandState,
-  context: AnonymizedContextPayload,
+  context: SelectedOfferRequest["intent"],
 ) {
   const tags = [context.timeOfDay, context.weatherBucket, demandState.toLowerCase()];
 
-  if (merchant.zoneId === context.zoneId) tags.push("nearby-zone");
   if (context.intentLabels.length > 0) tags.push(...context.intentLabels);
 
   return tags;
 }
 
 function buildUiSpec(
-  merchant: MerchantCandidate,
+  merchant: MerchantWithMetadata,
   discountPercent: number,
-  context: AnonymizedContextPayload,
+  context: SelectedOfferRequest["intent"],
   explanationTags: string[],
 ): OfferUiSpec {
   const warmContext =

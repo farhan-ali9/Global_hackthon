@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dklingbeil.city-wallet"
     },
     "android": {
       "adaptiveIcon": {
@@ -37,6 +38,16 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      "expo-build-properties",
+      [
+        "llama.rn",
+        {
+          "enableEntitlements": true,
+          "entitlementsProfile": "production",
+          "forceCxx20": true,
+          "enableOpenCL": true
         }
       ]
     ],

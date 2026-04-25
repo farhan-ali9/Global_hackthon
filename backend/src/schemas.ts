@@ -1,8 +1,7 @@
 import { z } from "zod";
 
-export const anonymizedContextSchema = z.object({
+export const offerIntentSchema = z.object({
   cityId: z.string().min(1),
-  zoneId: z.string().min(1),
   timeOfDay: z.enum(["morning", "lunch", "afternoon", "evening"]),
   weatherBucket: z.enum(["clear", "cloudy", "rain", "cold", "hot"]),
   intentLabels: z
@@ -10,4 +9,9 @@ export const anonymizedContextSchema = z.object({
     .default([]),
   eventTags: z.array(z.string()).default([]),
   demandTags: z.array(z.string()).default([]),
+});
+
+export const selectedOfferRequestSchema = z.object({
+  merchantId: z.string().min(1),
+  intent: offerIntentSchema,
 });

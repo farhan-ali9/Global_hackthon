@@ -1,20 +1,16 @@
-import type { AnonymizedContextPayload } from "@/src/types/city-wallet";
-
 export type ContextProvider = {
-  getAnonymizedContext: () => Promise<AnonymizedContextPayload>;
+  getLocalSignals: () => Promise<LocalSignalSnapshot>;
 };
 
-// Context team: replace this with local-model anonymization of real context.
-export const mockContextProvider: ContextProvider = {
-  async getAnonymizedContext() {
-    return {
-      cityId: "stuttgart-demo",
-      zoneId: "old-town",
-      timeOfDay: "lunch",
-      weatherBucket: "cold",
-      intentLabels: ["browsing", "seeking_warmth"],
-      eventTags: [],
-      demandTags: ["quiet"],
-    };
-  },
+export type LocalSignalSnapshot = {
+  cityId: string;
+  localSignalSummary: string;
+  zoneId?: string;
+  capturedAt?: string;
 };
+
+export const createUnavailableContextProvider = (): ContextProvider => ({
+  async getLocalSignals() {
+    throw new Error("Local signal capture is not wired yet");
+  },
+});

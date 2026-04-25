@@ -1,19 +1,27 @@
 import type {
-  AnonymizedContextPayload,
   GeneratedOfferResponse,
+  MerchantCandidate,
   RedemptionResponse,
+  SelectedOfferRequest,
 } from "@/src/types/city-wallet";
 
 const apiBaseUrl =
   process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
   "http://localhost:4000";
+const requestTimeoutMs = 10_000;
+
+export async function getMerchantCandidates(
+  cityId: string,
+): Promise<{ candidates: MerchantCandidate[] }> {
+  return request(`/merchants/candidates?cityId=${encodeURIComponent(cityId)}`);
+}
 
 export async function generateOffer(
-  context: AnonymizedContextPayload,
+  selectedOfferRequest: SelectedOfferRequest,
 ): Promise<GeneratedOfferResponse> {
   return request("/offers/generate", {
     method: "POST",
-    body: JSON.stringify(context),
+    body: JSON.stringify(selectedOfferRequest),
   });
 }
 
@@ -40,13 +48,30 @@ export async function validateRedemption(
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+  const url = `${apiBaseUrl}${path}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), requestTimeoutMs);
+
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Request timed out after ${requestTimeoutMs / 1000}s: ${url}`);
+    }
+
+    throw new Error(`Network request failed: ${url}`);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const message = await response.text();

@@ -76,7 +76,7 @@ model DemandSignal {
 model Offer {
   id                String      @id @default(cuid())
   merchantId        String
-  anonymizedContext Json
+  intent            Json        @map("anonymizedContext")
   uiSpec            Json
   discountPercent   Int
   status            OfferStatus @default(GENERATED)

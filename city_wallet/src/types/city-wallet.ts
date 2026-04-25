@@ -7,14 +7,39 @@ export type IntentLabel =
   | "commuting"
   | "social";
 
-export type AnonymizedContextPayload = {
+export type MerchantCategory = "cafe" | "restaurant" | "retail" | "culture";
+export type DemandState = "quiet" | "normal" | "busy";
+
+export type OfferIntent = {
   cityId: string;
-  zoneId: string;
   timeOfDay: TimeOfDay;
   weatherBucket: WeatherBucket;
   intentLabels: IntentLabel[];
   eventTags: string[];
   demandTags: string[];
+};
+
+export type SelectedOfferRequest = {
+  merchantId: string;
+  intent: OfferIntent;
+};
+
+export type MerchantCandidate = {
+  id: string;
+  name: string;
+  category: MerchantCategory;
+  cityId: string;
+  zoneId: string;
+  distanceMeters: number;
+  rule: {
+    maxDiscountPercent: number;
+    quietHours: string;
+  } | null;
+  demand: {
+    state: DemandState;
+    score: number;
+    observedAt: string;
+  } | null;
 };
 
 export type OfferUiSpec = {
