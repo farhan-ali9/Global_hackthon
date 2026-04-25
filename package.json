@@ -2,9 +2,9 @@
   "name": "hacknation5-project",
   "private": true,
   "scripts": {
-    "start": "cd city_wallet && npx expo start",
-    "android": "cd city_wallet && npx expo start --android",
-    "ios": "cd city_wallet && npx expo start --ios",
-    "web": "cd city_wallet && npx expo start --web"
+    "start":   "cd city_wallet && npm start",
+    "android": "cd city_wallet && npm run android",
+    "ios":     "cd city_wallet && npm run ios",
+    "web":     "cd city_wallet && npm run web"
   }
 }
