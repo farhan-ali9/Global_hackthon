@@ -1,109 +1,102 @@
-import { Link, type Href, useLocalSearchParams } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { type Href, useRouter } from "expo-router";
+import { useState } from "react";
+import { Button, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { Screen } from "@/src/components/Screen";
-import { demoContextSnapshot, demoMerchant, demoOffer } from "@/src/data/mockData";
+import { acceptOffer } from "@/src/lib/api";
+import { getLatestOffer, setLatestRedemption } from "@/src/lib/demoState";
 
 export default function OfferDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const offer = getLatestOffer();
+  const [error, setError] = useState<string | null>(null);
+  const [isAccepting, setIsAccepting] = useState(false);
+
+  async function handleAcceptOffer() {
+    if (!offer) return;
+
+    setIsAccepting(true);
+    setError(null);
+
+    try {
+      const redemption = await acceptOffer(offer.offer.id);
+      setLatestRedemption(redemption);
+      router.push(`/redeem/${redemption.token}` as Href);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not accept offer");
+    } finally {
+      setIsAccepting(false);
+    }
+  }
+
+  if (!offer) {
+    return (
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>No offer loaded</Text>
+        <Text style={styles.body}>Generate an offer from the home screen first.</Text>
+      </ScrollView>
+    );
+  }
 
   return (
-    <Screen>
-      <View>
-        <Text style={styles.eyebrow}>Generated offer</Text>
-        <Text style={styles.title}>{demoOffer.title}</Text>
-        <Text style={styles.subtitle}>{demoMerchant.name}</Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>{offer.ui.headline}</Text>
+      <Text style={styles.body}>{offer.ui.body}</Text>
+
+      <View style={styles.panel}>
+        <Text style={styles.sectionTitle}>Offer</Text>
+        <Text style={styles.body}>Merchant: {offer.offer.merchant.name}</Text>
+        <Text style={styles.body}>Discount: {offer.offer.discountPercent}%</Text>
+        <Text style={styles.body}>Expires: {offer.offer.expiresAt}</Text>
       </View>
 
       <View style={styles.panel}>
-        <Text style={styles.hook}>{demoOffer.hook}</Text>
-        <Text style={styles.discount}>{demoOffer.discountPercent}% off</Text>
-        <Text style={styles.body}>{demoOffer.reason}</Text>
-      </View>
-
-      <View style={styles.panel}>
-        <Text style={styles.sectionTitle}>Context snapshot</Text>
-        <Text style={styles.body}>
-          {demoContextSnapshot.weather}, {demoContextSnapshot.temperatureCelsius} C,
-          {` ${demoContextSnapshot.timeOfDay}`}
+        <Text style={styles.sectionTitle}>GenUI payload</Text>
+        <Text selectable style={styles.code}>
+          {JSON.stringify(offer.ui, null, 2)}
         </Text>
-        <Text style={styles.body}>{demoContextSnapshot.demandSignal}</Text>
       </View>
 
-      <Link
-        href={`/redeem/${id ?? demoOffer.id}` as Href}
-        style={styles.primaryLink}
-      >
-        Accept and redeem
-      </Link>
-      <Link href={"/merchant/dashboard" as Href} style={styles.secondaryLink}>
-        Open merchant dashboard
-      </Link>
-    </Screen>
+      <Button
+        title={isAccepting ? "Accepting..." : "Accept offer"}
+        onPress={handleAcceptOffer}
+        disabled={isAccepting}
+      />
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  eyebrow: {
-    color: "#7C3F1D",
-    fontSize: 13,
-    fontWeight: "800",
-    textTransform: "uppercase",
+  container: {
+    gap: 16,
+    padding: 20,
+    paddingBottom: 40,
   },
   title: {
-    color: "#1F1A16",
-    fontSize: 34,
-    fontWeight: "900",
-    marginTop: 6,
-  },
-  subtitle: {
-    color: "#75695D",
-    fontSize: 16,
-    marginTop: 4,
+    fontSize: 28,
+    fontWeight: "800",
   },
   panel: {
     gap: 10,
-    padding: 18,
-    borderRadius: 8,
+    padding: 12,
     backgroundColor: "#FFFFFF",
-    borderColor: "#E8E1D4",
+    borderColor: "#DDDDDD",
     borderWidth: 1,
   },
-  hook: {
-    color: "#1F1A16",
-    fontSize: 20,
-    fontWeight: "700",
-    lineHeight: 28,
-  },
-  discount: {
-    color: "#0E6E55",
-    fontSize: 30,
-    fontWeight: "900",
-  },
   sectionTitle: {
-    color: "#1F1A16",
-    fontSize: 17,
-    fontWeight: "800",
+    fontSize: 16,
+    fontWeight: "700",
   },
   body: {
-    color: "#4F463E",
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 21,
   },
-  primaryLink: {
-    backgroundColor: "#1F1A16",
-    borderRadius: 8,
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
-    overflow: "hidden",
-    padding: 16,
-    textAlign: "center",
+  code: {
+    fontFamily: "Courier",
+    fontSize: 12,
+    lineHeight: 17,
   },
-  secondaryLink: {
-    color: "#7C3F1D",
-    fontSize: 15,
-    fontWeight: "700",
-    textAlign: "center",
+  error: {
+    color: "#B00020",
   },
 });

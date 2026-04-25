@@ -1,13 +1,20 @@
-import { demoContextSnapshot } from "@/src/data/mockData";
-import type { ContextSnapshot } from "@/src/types/city-wallet";
+import type { AnonymizedContextPayload } from "@/src/types/city-wallet";
 
 export type ContextProvider = {
-  getCurrentSnapshot: () => Promise<ContextSnapshot>;
+  getAnonymizedContext: () => Promise<AnonymizedContextPayload>;
 };
 
-// Context team: replace this with location, weather, events, and demand signals.
+// Context team: replace this with local-model anonymization of real context.
 export const mockContextProvider: ContextProvider = {
-  async getCurrentSnapshot() {
-    return demoContextSnapshot;
+  async getAnonymizedContext() {
+    return {
+      cityId: "stuttgart-demo",
+      zoneId: "old-town",
+      timeOfDay: "lunch",
+      weatherBucket: "cold",
+      intentLabels: ["browsing", "seeking_warmth"],
+      eventTags: [],
+      demandTags: ["quiet"],
+    };
   },
 };
