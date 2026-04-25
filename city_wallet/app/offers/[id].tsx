@@ -1,102 +1,125 @@
-import { type Href, useRouter } from "expo-router";
-import { useState } from "react";
-import { Button, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Link, type Href, useLocalSearchParams } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { acceptOffer } from "@/src/lib/api";
-import { getLatestOffer, setLatestRedemption } from "@/src/lib/demoState";
+import { Screen } from "@/src/components/Screen";
+import { demoContextSnapshot, demoMerchant, demoOffer } from "@/src/data/mockData";
+import { color, fontFamily, radii, shadow } from "@/src/theme/tokens";
 
 export default function OfferDetailScreen() {
-  const router = useRouter();
-  const offer = getLatestOffer();
-  const [error, setError] = useState<string | null>(null);
-  const [isAccepting, setIsAccepting] = useState(false);
-
-  async function handleAcceptOffer() {
-    if (!offer) return;
-
-    setIsAccepting(true);
-    setError(null);
-
-    try {
-      const redemption = await acceptOffer(offer.offer.id);
-      setLatestRedemption(redemption);
-      router.push(`/redeem/${redemption.token}` as Href);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not accept offer");
-    } finally {
-      setIsAccepting(false);
-    }
-  }
-
-  if (!offer) {
-    return (
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>No offer loaded</Text>
-        <Text style={styles.body}>Generate an offer from the home screen first.</Text>
-      </ScrollView>
-    );
-  }
+  const { id } = useLocalSearchParams<{ id: string }>();
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{offer.ui.headline}</Text>
-      <Text style={styles.body}>{offer.ui.body}</Text>
-
-      <View style={styles.panel}>
-        <Text style={styles.sectionTitle}>Offer</Text>
-        <Text style={styles.body}>Merchant: {offer.offer.merchant.name}</Text>
-        <Text style={styles.body}>Discount: {offer.offer.discountPercent}%</Text>
-        <Text style={styles.body}>Expires: {offer.offer.expiresAt}</Text>
+    <Screen appBarTitle="Offer">
+      <View>
+        <Text style={styles.eyebrow}>Generated offer</Text>
+        <Text style={styles.title}>{demoOffer.title}</Text>
+        <Text style={styles.subtitle}>{demoMerchant.name}</Text>
       </View>
 
       <View style={styles.panel}>
-        <Text style={styles.sectionTitle}>GenUI payload</Text>
-        <Text selectable style={styles.code}>
-          {JSON.stringify(offer.ui, null, 2)}
+        <Text style={styles.hook}>{demoOffer.hook}</Text>
+        <Text style={styles.discount}>{demoOffer.discountPercent}% off</Text>
+        <Text style={styles.body}>{demoOffer.reason}</Text>
+      </View>
+
+      <View style={styles.panel}>
+        <Text style={styles.sectionTitle}>Context snapshot</Text>
+        <Text style={styles.body}>
+          {demoContextSnapshot.weather}, {demoContextSnapshot.temperatureCelsius}°C,
+          {` ${demoContextSnapshot.timeOfDay}`}
         </Text>
+        <Text style={styles.body}>{demoContextSnapshot.demandSignal}</Text>
       </View>
 
-      <Button
-        title={isAccepting ? "Accepting..." : "Accept offer"}
-        onPress={handleAcceptOffer}
-        disabled={isAccepting}
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-    </ScrollView>
+      <Link href={`/redeem/${id ?? demoOffer.id}` as Href} asChild>
+        <Pressable style={({ pressed }) => [styles.primaryCta, pressed && styles.pressed]}>
+          <Text style={styles.primaryCtaText}>Accept and redeem</Text>
+        </Pressable>
+      </Link>
+      <Link href={"/merchant/dashboard" as Href} asChild>
+        <Pressable style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
+          <Text style={styles.secondaryText}>Open merchant dashboard</Text>
+        </Pressable>
+      </Link>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: 16,
-    padding: 20,
-    paddingBottom: 40,
+  body: {
+    color: color.secondary,
+    fontFamily: fontFamily.medium,
+    fontSize: 15,
+    fontWeight: "500",
+    lineHeight: 24,
   },
-  title: {
-    fontSize: 28,
+  discount: {
+    color: color.success,
+    fontFamily: fontFamily.extrabold,
+    fontSize: 32,
     fontWeight: "800",
   },
-  panel: {
-    gap: 10,
-    padding: 12,
-    backgroundColor: "#FFFFFF",
-    borderColor: "#DDDDDD",
-    borderWidth: 1,
+  eyebrow: {
+    color: color.primary,
+    fontFamily: fontFamily.semibold,
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 2,
+    textTransform: "uppercase",
   },
-  sectionTitle: {
+  hook: {
+    color: color.onSurface,
+    fontFamily: fontFamily.bold,
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 28,
+  },
+  panel: {
+    backgroundColor: color.surfaceContainer,
+    borderRadius: radii.card,
+    gap: 10,
+    padding: 20,
+    ...shadow.soft,
+  },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
+  primaryCta: {
+    alignItems: "center",
+    backgroundColor: color.primary,
+    borderRadius: radii.button,
+    marginTop: 4,
+    paddingVertical: 16,
+  },
+  primaryCtaText: {
+    color: "#FFFFFF",
+    fontFamily: fontFamily.bold,
     fontSize: 16,
     fontWeight: "700",
   },
-  body: {
+  sectionTitle: {
+    color: color.onSurface,
+    fontFamily: fontFamily.bold,
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  secondary: { alignItems: "center", paddingVertical: 8 },
+  secondaryText: {
+    color: color.primary,
+    fontFamily: fontFamily.bold,
     fontSize: 15,
-    lineHeight: 21,
+    fontWeight: "700",
   },
-  code: {
-    fontFamily: "Courier",
-    fontSize: 12,
-    lineHeight: 17,
+  subtitle: {
+    color: color.secondary,
+    fontFamily: fontFamily.medium,
+    fontSize: 16,
+    fontWeight: "500",
+    marginTop: 4,
   },
-  error: {
-    color: "#B00020",
+  title: {
+    color: color.onSurface,
+    fontFamily: fontFamily.extrabold,
+    fontSize: 30,
+    fontWeight: "800",
+    marginTop: 6,
   },
 });

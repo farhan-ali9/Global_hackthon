@@ -1,107 +1,115 @@
-import { useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
-import { Button, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Link, type Href } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { getRedemption, validateRedemption } from "@/src/lib/api";
-import {
-  getLatestRedemption,
-  setLatestRedemption,
-} from "@/src/lib/demoState";
-import type { RedemptionResponse } from "@/src/types/city-wallet";
+import { Screen } from "@/src/components/Screen";
+import { demoMerchant, demoRedemption } from "@/src/data/mockData";
+import { color, fontFamily, radii, shadow } from "@/src/theme/tokens";
 
 export default function RedemptionScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const token = id ?? getLatestRedemption()?.token;
-  const [redemption, setRedemption] = useState<RedemptionResponse | null>(
-    getLatestRedemption(),
-  );
-  const [error, setError] = useState<string | null>(null);
-  const [isValidating, setIsValidating] = useState(false);
-
-  useEffect(() => {
-    if (!token) return;
-
-    getRedemption(token)
-      .then((latest) => {
-        setLatestRedemption(latest);
-        setRedemption(latest);
-      })
-      .catch((reason) => {
-        setError(reason instanceof Error ? reason.message : "Could not load token");
-      });
-  }, [token]);
-
-  async function handleValidate() {
-    if (!token) return;
-
-    setIsValidating(true);
-    setError(null);
-
-    try {
-      const latest = await validateRedemption(token);
-      setLatestRedemption(latest);
-      setRedemption(latest);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not validate token");
-    } finally {
-      setIsValidating(false);
-    }
-  }
-
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Redemption</Text>
-
-      <View style={styles.panel}>
-        <Text style={styles.sectionTitle}>Token</Text>
-        <Text selectable style={styles.token}>
-          {token ?? "No token"}
-        </Text>
-        <Text style={styles.body}>Status: {redemption?.status ?? "loading"}</Text>
-        <Text style={styles.body}>Expires: {redemption?.expiresAt ?? "unknown"}</Text>
+    <Screen appBarTitle="Redeem">
+      <View>
+        <Text style={styles.eyebrow}>Redemption</Text>
+        <Text style={styles.title}>Show this token at {demoMerchant.name}</Text>
       </View>
 
-      <Button
-        title={isValidating ? "Validating..." : "Validate redemption"}
-        onPress={handleValidate}
-        disabled={!token || isValidating}
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-    </ScrollView>
+      <View style={styles.qrPlaceholder}>
+        <Text style={styles.qrText}>QR</Text>
+      </View>
+
+      <View style={styles.tokenBox}>
+        <Text style={styles.tokenLabel}>Token</Text>
+        <Text style={styles.token}>{demoRedemption.token}</Text>
+        <Text style={styles.body}>
+          Placeholder for QR/token validation. Backend can connect this to Firestore
+          redemption status later.
+        </Text>
+      </View>
+
+      <Link href={"/merchant/dashboard" as Href} asChild>
+        <Pressable style={({ pressed }) => [styles.primaryCta, pressed && styles.pressed]}>
+          <Text style={styles.primaryCtaText}>Simulate merchant validation</Text>
+        </Pressable>
+      </Link>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: 16,
-    padding: 20,
-    paddingBottom: 40,
+  body: {
+    color: color.secondary,
+    fontFamily: fontFamily.medium,
+    fontSize: 15,
+    fontWeight: "500",
+    lineHeight: 24,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
+  eyebrow: {
+    color: color.primary,
+    fontFamily: fontFamily.semibold,
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 2,
+    textTransform: "uppercase",
   },
-  panel: {
-    gap: 8,
-    padding: 12,
-    backgroundColor: "#FFFFFF",
-    borderColor: "#DDDDDD",
-    borderWidth: 1,
+  pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
+  primaryCta: {
+    alignItems: "center",
+    backgroundColor: color.primary,
+    borderRadius: radii.button,
+    marginTop: 4,
+    paddingVertical: 16,
   },
-  sectionTitle: {
+  primaryCtaText: {
+    color: "#FFFFFF",
+    fontFamily: fontFamily.bold,
     fontSize: 16,
     fontWeight: "700",
   },
+  qrPlaceholder: {
+    alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: color.surfaceContainer,
+    borderColor: color.primary,
+    borderRadius: radii.button,
+    borderWidth: 2,
+    height: 220,
+    justifyContent: "center",
+    width: 220,
+    ...shadow.soft,
+  },
+  qrText: {
+    color: color.onSurface,
+    fontFamily: fontFamily.extrabold,
+    fontSize: 42,
+    fontWeight: "800",
+  },
+  title: {
+    color: color.onSurface,
+    fontFamily: fontFamily.extrabold,
+    fontSize: 28,
+    fontWeight: "800",
+    lineHeight: 34,
+    marginTop: 6,
+  },
   token: {
+    color: color.onSurface,
+    fontFamily: fontFamily.extrabold,
     fontSize: 32,
     fontWeight: "800",
-    letterSpacing: 0,
   },
-  body: {
-    fontSize: 15,
-    lineHeight: 21,
+  tokenBox: {
+    backgroundColor: color.surfaceContainer,
+    borderRadius: radii.card,
+    gap: 8,
+    padding: 20,
+    ...shadow.soft,
   },
-  error: {
-    color: "#B00020",
+  tokenLabel: {
+    color: color.onSurfaceVariant,
+    fontFamily: fontFamily.semibold,
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
   },
 });
