@@ -1,9 +1,8 @@
 # City Wallet App
 
-Expo Go-compatible mobile app scaffold for the Generative City Wallet hackathon
-project. It currently uses mock data and placeholder interfaces so different
-team members can work on backend, context, AI, and UI without blocking each
-other.
+Expo Go-compatible mobile app for the City Wallet demo. The app sends
+anonymized context to the backend, shows the returned GenUI offer payload,
+accepts the offer, and displays a redemption token.
 
 ## Running Locally
 
@@ -16,44 +15,44 @@ Open the project with Expo Go from the Metro output.
 
 ## Environment
 
-Firebase is initialized with the Firebase JS SDK for Expo Go compatibility.
-Create a local `.env` file from `.env.example` when Firebase credentials are
-available:
+Create a local `.env` file from `.env.example`:
 
 ```bash
 cp .env.example .env
 ```
 
-Only `EXPO_PUBLIC_FIREBASE_*` variables are expected in this first pass.
+Default:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://localhost:4000
+```
+
+For Expo Go on a physical device, use your computer's LAN IP:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
+```
 
 ## Structure
 
-- `app/index.tsx` - Consumer home with one mock generated offer.
-- `app/offers/[id].tsx` - Offer detail screen.
-- `app/redeem/[id].tsx` - Placeholder redemption token/QR screen.
-- `app/merchant/dashboard.tsx` - Merchant performance mock dashboard.
-- `app/merchant/rules.tsx` - Merchant rule/guardrail mock screen.
-- `src/components/` - Shared UI building blocks.
-- `src/data/mockData.ts` - Temporary data for the scaffold.
-- `src/types/city-wallet.ts` - Shared domain types.
-- `src/lib/firebase.ts` - Firebase app and Firestore initialization.
-- `src/lib/firebaseRepositories.ts` - Backend stubs for future Firestore work.
-- `src/context-engine/ContextProvider.ts` - Context provider interface and mock.
-- `src/ai/OfferGenerator.ts` - Offer generator interface and mock.
+- `app/index.tsx` - Sends anonymized context and shows returned GenUI JSON.
+- `app/offers/[id].tsx` - Plain offer detail and accept action.
+- `app/redeem/[id].tsx` - Plain redemption token/status screen.
+- `src/context-engine/ContextProvider.ts` - Mock local anonymized-context
+  provider.
+- `src/lib/api.ts` - Backend API client.
+- `src/lib/demoState.ts` - In-memory handoff between demo screens.
+- `src/types/city-wallet.ts` - API contracts shared by the mobile app.
 
 ## How to Work With It
 
-- UI work should add screens under `app/` and reusable pieces under
-  `src/components/`.
-- Backend work should replace the stub functions in `src/lib/` with Firestore
-  reads and writes.
+- Keep UI minimal until the backend/context path is stable.
+- Backend work happens in `../backend/`; the app only calls the API.
 - Context work should replace `mockContextProvider` with location, weather,
-  events, and demand signal processing.
-- AI work should replace `mockOfferGenerator` with a real generation adapter.
-  Keep this Expo Go-safe until the team intentionally moves to a development
-  build for native on-device model support.
-- Shared data contracts should be added to `src/types/city-wallet.ts` before
-  being used across screens or services.
+  events, demand signals, and local-model anonymization.
+- AI work on-device should output `AnonymizedContextPayload`.
+- Backend generation returns safe typed GenUI JSON, not remote executable UI
+  code.
 
 ## Checks
 
@@ -64,5 +63,5 @@ npx tsc --noEmit
 
 ## Current Scope
 
-This scaffold does not yet implement real Firestore persistence, real context
-signals, push notifications, QR validation, or React Native AI native modules.
+This scaffold does not yet implement real context signals, push notifications,
+QR rendering, or React Native AI native modules.

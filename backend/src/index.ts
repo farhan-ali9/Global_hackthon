@@ -1,0 +1,207 @@
+import cors from "cors";
+import dotenv from "dotenv";
+import express from "express";
+import { ZodError } from "zod";
+
+import { prisma } from "./db";
+import { createDeterministicOfferGenerator } from "./generator/deterministicOfferGenerator";
+import { anonymizedContextSchema } from "./schemas";
+import type { RedemptionResponse } from "./types";
+
+dotenv.config({ quiet: true });
+
+const app = express();
+const port = Number(process.env.PORT ?? 4000);
+const corsOrigin = process.env.CORS_ORIGIN ?? "*";
+const offerGenerator = createDeterministicOfferGenerator(prisma);
+
+app.use(
+  cors({
+    origin:
+      corsOrigin === "*"
+        ? "*"
+        : corsOrigin.split(",").map((origin) => origin.trim()),
+  }),
+);
+app.use(express.json());
+
+app.get("/health", (_request, response) => {
+  response.json({ ok: true });
+});
+
+app.post("/offers/generate", async (request, response, next) => {
+  try {
+    const context = anonymizedContextSchema.parse(request.body);
+    const generatedOffer = await offerGenerator.generateOffer(context);
+
+    response.status(201).json(generatedOffer);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/offers/:offerId/accept", async (request, response, next) => {
+  try {
+    const offer = await prisma.offer.findUnique({
+      where: { id: request.params.offerId },
+      include: { redemption: true },
+    });
+
+    if (!offer) {
+      response.status(404).json({ error: "Offer not found" });
+      return;
+    }
+
+    if (offer.expiresAt.getTime() <= Date.now()) {
+      await prisma.offer.update({
+        where: { id: offer.id },
+        data: { status: "EXPIRED" },
+      });
+      response.status(409).json({ error: "Offer expired" });
+      return;
+    }
+
+    if (offer.redemption) {
+      response.json(toRedemptionResponse(offer.redemption));
+      return;
+    }
+
+    const redemption = await prisma.redemption.create({
+      data: {
+        offerId: offer.id,
+        merchantId: offer.merchantId,
+        token: await createUniqueToken(),
+        expiresAt: offer.expiresAt,
+      },
+    });
+
+    await prisma.offer.update({
+      where: { id: offer.id },
+      data: { status: "ACCEPTED" },
+    });
+
+    response.status(201).json(toRedemptionResponse(redemption));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/redemptions/:token", async (request, response, next) => {
+  try {
+    const redemption = await prisma.redemption.findUnique({
+      where: { token: request.params.token.toUpperCase() },
+    });
+
+    if (!redemption) {
+      response.status(404).json({ error: "Redemption not found" });
+      return;
+    }
+
+    response.json(toRedemptionResponse(redemption));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/redemptions/:token/validate", async (request, response, next) => {
+  try {
+    const token = request.params.token.toUpperCase();
+    const redemption = await prisma.redemption.findUnique({
+      where: { token },
+    });
+
+    if (!redemption) {
+      response.status(404).json({ error: "Redemption not found" });
+      return;
+    }
+
+    if (redemption.status === "REDEEMED") {
+      response.json(toRedemptionResponse(redemption));
+      return;
+    }
+
+    if (redemption.expiresAt.getTime() <= Date.now()) {
+      const expiredRedemption = await prisma.redemption.update({
+        where: { token },
+        data: { status: "EXPIRED" },
+      });
+      await prisma.offer.update({
+        where: { id: redemption.offerId },
+        data: { status: "EXPIRED" },
+      });
+      response.status(409).json(toRedemptionResponse(expiredRedemption));
+      return;
+    }
+
+    const redeemed = await prisma.redemption.update({
+      where: { token },
+      data: { status: "REDEEMED" },
+    });
+    await prisma.offer.update({
+      where: { id: redemption.offerId },
+      data: { status: "REDEEMED" },
+    });
+
+    response.json(toRedemptionResponse(redeemed));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.use(
+  (
+    error: unknown,
+    _request: express.Request,
+    response: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    if (error instanceof ZodError) {
+      response
+        .status(400)
+        .json({ error: "Invalid request body", details: error.flatten() });
+      return;
+    }
+
+    const statusCode =
+      typeof error === "object" &&
+      error !== null &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number"
+        ? error.statusCode
+        : 500;
+
+    console.error(error);
+    response.status(statusCode).json({ error: "Internal server error" });
+  },
+);
+
+app.listen(port, () => {
+  console.log(`City Wallet API listening on port ${port}`);
+});
+
+async function createUniqueToken() {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const token = `CITY-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const existing = await prisma.redemption.findUnique({ where: { token } });
+
+    if (!existing) return token;
+  }
+
+  throw new Error("Could not generate unique redemption token");
+}
+
+function toRedemptionResponse(redemption: {
+  token: string;
+  offerId: string;
+  merchantId: string;
+  status: "PENDING" | "REDEEMED" | "EXPIRED";
+  expiresAt: Date;
+}): RedemptionResponse {
+  return {
+    token: redemption.token,
+    offerId: redemption.offerId,
+    merchantId: redemption.merchantId,
+    status: redemption.status.toLowerCase() as RedemptionResponse["status"],
+    expiresAt: redemption.expiresAt.toISOString(),
+  };
+}

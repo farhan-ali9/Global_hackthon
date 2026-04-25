@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MerchantCategory {
+  CAFE
+  RESTAURANT
+  RETAIL
+  CULTURE
+}
+
+enum DemandState {
+  QUIET
+  NORMAL
+  BUSY
+}
+
+enum OfferStatus {
+  GENERATED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REDEEMED
+}
+
+enum RedemptionStatus {
+  PENDING
+  REDEEMED
+  EXPIRED
+}
+
+model Merchant {
+  id             String           @id
+  name           String
+  category       MerchantCategory
+  cityId         String
+  zoneId         String
+  distanceMeters Int
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  rule           MerchantRule?
+  demandSignals  DemandSignal[]
+  offers         Offer[]
+  redemptions    Redemption[]
+}
+
+model MerchantRule {
+  id                 String   @id
+  merchantId         String   @unique
+  goal               String
+  maxDiscountPercent Int
+  quietHours         String
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  merchant           Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+}
+
+model DemandSignal {
+  id         String      @id @default(cuid())
+  merchantId String
+  state      DemandState
+  score      Int
+  observedAt DateTime    @default(now())
+  merchant   Merchant    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId, observedAt])
+}
+
+model Offer {
+  id                String      @id @default(cuid())
+  merchantId        String
+  anonymizedContext Json
+  uiSpec            Json
+  discountPercent   Int
+  status            OfferStatus @default(GENERATED)
+  expiresAt         DateTime
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  merchant          Merchant    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  redemption        Redemption?
+}
+
+model Redemption {
+  id         String           @id @default(cuid())
+  offerId    String           @unique
+  merchantId String
+  token      String           @unique
+  status     RedemptionStatus @default(PENDING)
+  expiresAt  DateTime
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  offer      Offer            @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  merchant   Merchant         @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+}

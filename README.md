@@ -1,11 +1,25 @@
 # City Wallet Hackathon
 
-City Wallet is an Expo Go app for the DSV-Gruppe Generative City Wallet challenge.
-The app scaffold lives in `city_wallet/` and is set up for a simple consumer flow,
-merchant flow, Firebase backend integration, context processing, and future
-on-device AI offer generation.
+City Wallet is the DSV-Gruppe Generative City Wallet hackathon project. The repo
+has two packages:
 
-## Start the App
+- `backend/` - TypeScript/Postgres API for offer generation and redemption.
+- `city_wallet/` - Expo Go mobile app for the tiny end-to-end demo flow.
+
+## Local Startup
+
+Start Postgres and the backend:
+
+```bash
+docker compose up -d db
+cd backend
+npm install
+npm run db:migrate
+npm run db:seed
+npm run dev
+```
+
+In another terminal, start the Expo app:
 
 ```bash
 cd city_wallet
@@ -13,16 +27,32 @@ npm install
 npm start
 ```
 
-Use Expo Go to open the app from the Metro output.
+Use Expo Go to open the app from the Metro output. If testing on a physical
+phone, set `EXPO_PUBLIC_API_BASE_URL` to your computer's LAN IP instead of
+`localhost`.
 
 ## Project Structure
 
-- `city_wallet/app/` - Expo Router screens for the consumer and merchant flows.
-- `city_wallet/src/components/` - Reusable UI components.
-- `city_wallet/src/data/` - Temporary mock data used by the scaffold.
-- `city_wallet/src/types/` - Shared City Wallet domain types.
-- `city_wallet/src/lib/` - Firebase initialization and backend repository stubs.
-- `city_wallet/src/context-engine/` - Placeholder context provider interface.
-- `city_wallet/src/ai/` - Placeholder offer generator interface.
+- `backend/prisma/` - Postgres schema, migration, and seed data.
+- `backend/src/` - Express API, request schemas, and deterministic offer
+  generator.
+- `city_wallet/app/` - Minimal generate, offer detail, and redemption screens.
+- `city_wallet/src/context-engine/` - Placeholder local anonymized-context
+  provider.
+- `city_wallet/src/lib/` - API client and in-memory demo handoff state.
+- `city_wallet/src/types/` - Mobile API contracts.
 
-See `city_wallet/README.md` for app-specific details.
+## Flow
+
+1. The mobile context provider returns an anonymized context payload.
+2. The app sends it to `POST /offers/generate`.
+3. The backend scores seeded merchants from Postgres and creates a typed GenUI
+   JSON offer.
+4. The app displays the returned payload.
+5. Accepting the offer creates a redemption token.
+
+## DigitalOcean
+
+The backend is prepared for DigitalOcean App Platform. It listens on
+`process.env.PORT`, exposes `GET /health`, uses `DATABASE_URL` for Postgres, and
+includes a Dockerfile that runs Prisma migrations before starting the API.
