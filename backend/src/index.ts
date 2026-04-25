@@ -2,6 +2,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import { ZodError } from "zod";
+import { getWeatherByCoords } from "./weather";
 
 import { prisma } from "./db";
 import { createDeterministicOfferGenerator } from "./generator/deterministicOfferGenerator";
@@ -28,7 +29,25 @@ app.use(express.json());
 app.get("/health", (_request, response) => {
   response.json({ ok: true });
 });
+app.post("/context/weather", async (request, response, next) => {
+  try {
+    const { lat, lon } = request.body;
 
+    if (typeof lat !== "number" || typeof lon !== "number") {
+      response.status(400).json({ error: "lat and lon must be numbers" });
+      return;
+    }
+
+    const weather = await getWeatherByCoords(lat, lon);
+
+    response.json({
+      location: { lat, lon },
+      weather,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 app.post("/offers/generate", async (request, response, next) => {
   try {
     const context = anonymizedContextSchema.parse(request.body);
