@@ -1,22 +1,48 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter, type Href } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { COUPONS, REDEEMED_COUPONS } from "@/src/data/mockData";
+import type { Coupon } from "@/src/types/city-wallet";
 import { CW, fontFamily } from "@/src/theme/tokens";
 
-const QUICK_ACTIONS = [
-  { icon: "arrow-up-outline" as const, label: "Top Up" },
-  { icon: "bus-outline" as const, label: "Transit" },
-  { icon: "grid-outline" as const, label: "Services" },
-  { icon: "qr-code-outline" as const, label: "Scan" },
-];
+/* ── derived stats ── */
+const totalSaved = REDEEMED_COUPONS.filter((c) => c.savings).reduce((sum, c) => {
+  return sum + parseFloat((c.savings ?? "€0").replace(/[^0-9.]/g, ""));
+}, 0);
 
-const TRANSACTIONS = [
-  { icon: "subway-outline" as const, name: "Metro Line 2", detail: "Transit · Today", amount: "−€ 2.90", color: "#e8f4f0", pos: false },
-  { icon: "car-outline" as const, name: "City Parking", detail: "Services · Yesterday", amount: "−€ 6.00", color: "#f0eee8", pos: false },
-  { icon: "wallet-outline" as const, name: "Wallet Top Up", detail: "Income · Apr 20", amount: "+€ 50.00", color: "#eaf0e8", pos: true },
-];
+const POINTS = 1_240;
+
+/* ── compact redeemed-coupon row ── */
+function RecentRow({ coupon, onPress }: { coupon: Coupon; onPress: () => void }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.recentRow, pressed && styles.pressed]}
+      onPress={onPress}
+    >
+      {/* Logo circle */}
+      <View style={[styles.recentLogo, { backgroundColor: coupon.brandColor }]}>
+        <Text style={styles.recentLogoText}>{coupon.logoLetter}</Text>
+      </View>
+
+      {/* Info */}
+      <View style={styles.recentInfo}>
+        <Text style={styles.recentCompany}>{coupon.company}</Text>
+        <Text style={styles.recentOffer} numberOfLines={1}>
+          {coupon.offer} — {coupon.offerDetail}
+        </Text>
+      </View>
+
+      {/* Right */}
+      <View style={styles.recentRight}>
+        {coupon.savings && (
+          <Text style={styles.recentSavings}>−{coupon.savings}</Text>
+        )}
+        <Text style={styles.recentTime}>{coupon.redeemedAt?.split(",")[0] ?? ""}</Text>
+      </View>
+    </Pressable>
+  );
+}
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -24,7 +50,7 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
+      {/* ── Header ── */}
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Good morning</Text>
@@ -35,67 +61,74 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Balance card */}
-        <View style={styles.balanceCard}>
-          <View style={styles.balanceCircle} />
-          <Text style={styles.balanceLabel}>City Balance</Text>
-          <View style={styles.balanceRow}>
-            <Text style={styles.balanceAmount}>€ 284</Text>
-            <Text style={styles.balanceCents}>.50</Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Rewards card ── */}
+        <View style={styles.card}>
+          {/* decorative circles */}
+          <View style={styles.deco1} />
+          <View style={styles.deco2} />
+
+          <Text style={styles.cardLabel}>City Wallet</Text>
+
+          {/* Points — main number */}
+          <View style={styles.pointsRow}>
+            <Text style={styles.pointsNum}>{POINTS.toLocaleString()}</Text>
+            <Text style={styles.pointsUnit}> pts</Text>
           </View>
-          <View style={styles.balanceSubRow}>
-            {[{ l: "Transit", v: "€ 40 left" }, { l: "City Tax", v: "Paid ✓" }].map((item, i) => (
-              <View key={i} style={styles.balanceSub}>
-                <Text style={styles.balanceSubLabel}>{item.l}</Text>
-                <Text style={styles.balanceSubValue}>{item.v}</Text>
+
+          {/* Three sub-stats */}
+          <View style={styles.statsRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>Saved</Text>
+              <Text style={styles.statValue}>€ {totalSaved.toFixed(2)}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>Redeemed</Text>
+              <Text style={styles.statValue}>{REDEEMED_COUPONS.length}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>Available</Text>
+              <Text style={styles.statValue}>{COUPONS.length}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Recent section ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionLabel}>Recently Redeemed</Text>
+          <Pressable
+            style={({ pressed }) => [styles.seeAllBtn, pressed && styles.pressed]}
+            onPress={() => router.push("/(tabs)/activity" as Href)}
+          >
+            <Text style={styles.seeAllText}>See all →</Text>
+          </Pressable>
+        </View>
+
+        {REDEEMED_COUPONS.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>No redeemed coupons yet. Browse the Coupons tab!</Text>
+          </View>
+        ) : (
+          <View style={styles.recentList}>
+            {REDEEMED_COUPONS.map((c, i, arr) => (
+              <View key={c.id}>
+                <RecentRow
+                  coupon={c}
+                  onPress={() => router.push(`/coupon/${c.id}` as Href)}
+                />
+                {i < arr.length - 1 && <View style={styles.divider} />}
               </View>
             ))}
           </View>
-        </View>
+        )}
 
-        {/* Quick actions */}
-        <Text style={styles.sectionLabel}>Quick Actions</Text>
-        <View style={styles.quickGrid}>
-          {QUICK_ACTIONS.map((a, i) => (
-            <Pressable
-              key={i}
-              style={({ pressed }) => [styles.quickItem, pressed && styles.pressed]}
-              onPress={a.label === "Scan" ? () => router.push("/scan" as Href) : undefined}
-            >
-              <View style={styles.quickIcon}>
-                <Ionicons name={a.icon} size={22} color={CW.text} />
-              </View>
-              <Text style={styles.quickLabel}>{a.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Recent transactions */}
-        <View style={styles.recentHeader}>
-          <Text style={styles.sectionLabel}>Recent</Text>
-          <Text style={styles.seeAll}>See all →</Text>
-        </View>
-
-        <View style={styles.txList}>
-          {TRANSACTIONS.map((tx, i, arr) => (
-            <View
-              key={i}
-              style={[styles.txRow, i < arr.length - 1 && styles.txBorder]}
-            >
-              <View style={[styles.txIcon, { backgroundColor: tx.color }]}>
-                <Ionicons name={tx.icon} size={18} color={CW.text} />
-              </View>
-              <View style={styles.txInfo}>
-                <Text style={styles.txName}>{tx.name}</Text>
-                <Text style={styles.txDetail}>{tx.detail}</Text>
-              </View>
-              <Text style={[styles.txAmount, tx.pos && styles.txPos]}>{tx.amount}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={{ height: 8 }} />
+        <View style={{ height: 12 }} />
       </ScrollView>
     </View>
   );
@@ -103,6 +136,8 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: CW.bgAlt },
+
+  /* header */
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -111,103 +146,219 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     paddingTop: 4,
   },
-  greeting: { fontSize: 11, color: CW.soft, letterSpacing: 0.6, textTransform: "uppercase", fontFamily: fontFamily.medium },
-  name: { fontSize: 21, fontWeight: "500", letterSpacing: -0.7, color: CW.text, marginTop: 2, fontFamily: fontFamily.medium },
+  greeting: {
+    fontSize: 11,
+    color: CW.soft,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    fontFamily: fontFamily.medium,
+  },
+  name: {
+    fontSize: 21,
+    fontWeight: "500",
+    letterSpacing: -0.7,
+    color: CW.text,
+    marginTop: 2,
+    fontFamily: fontFamily.medium,
+  },
   avatarCircle: {
-    width: 38, height: 38, borderRadius: 19,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: "#c5a880",
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatarText: { fontSize: 14, fontWeight: "600", color: "#fff", fontFamily: fontFamily.bold },
 
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 22, paddingTop: 0 },
+  scrollContent: { paddingHorizontal: 22, gap: 20 },
 
-  /* balance card */
-  balanceCard: {
-    borderRadius: 22,
+  /* ── rewards card ── */
+  card: {
+    borderRadius: 24,
     backgroundColor: "#1a1a1c",
     padding: 22,
-    marginBottom: 18,
     overflow: "hidden",
     position: "relative",
   },
-  balanceCircle: {
+  deco1: {
     position: "absolute",
-    top: -20,
-    right: -20,
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    top: -30,
+    right: -30,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
     backgroundColor: "rgba(255,255,255,0.04)",
   },
-  balanceLabel: {
+  deco2: {
+    position: "absolute",
+    bottom: -20,
+    left: -20,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  cardLabel: {
     fontSize: 10,
-    letterSpacing: 1.5,
+    letterSpacing: 1.8,
     color: "rgba(255,255,255,0.45)",
     textTransform: "uppercase",
     fontFamily: fontFamily.semibold,
   },
-  balanceRow: { flexDirection: "row", alignItems: "flex-end", gap: 2, marginTop: 6 },
-  balanceAmount: { fontSize: 38, fontWeight: "300", color: "#fff", letterSpacing: -1.5, fontFamily: fontFamily.regular },
-  balanceCents: { fontSize: 17, color: "rgba(255,255,255,0.4)", fontWeight: "300", marginBottom: 4, fontFamily: fontFamily.regular },
-  balanceSubRow: { flexDirection: "row", gap: 10, marginTop: 14 },
-  balanceSub: {
+  pointsRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  pointsNum: {
+    fontSize: 42,
+    fontWeight: "300",
+    color: "#fff",
+    letterSpacing: -2,
+    fontFamily: fontFamily.regular,
+  },
+  pointsUnit: {
+    fontSize: 18,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "300",
+    marginBottom: 6,
+    fontFamily: fontFamily.regular,
+  },
+
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+  statBox: {
     flex: 1,
     backgroundColor: "rgba(255,255,255,0.07)",
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 3,
   },
-  balanceSubLabel: { fontSize: 9, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: 1, fontFamily: fontFamily.semibold },
-  balanceSubValue: { fontSize: 13, fontWeight: "500", color: "#fff", marginTop: 2, fontFamily: fontFamily.medium },
+  statDivider: { width: 8 },
+  statLabel: {
+    fontSize: 9,
+    color: "rgba(255,255,255,0.4)",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    fontFamily: fontFamily.semibold,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
+    letterSpacing: -0.3,
+    fontFamily: fontFamily.bold,
+  },
 
-  /* quick actions */
+  /* ── section header ── */
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   sectionLabel: {
     fontSize: 11,
-    fontWeight: "500",
+    fontWeight: "600",
     letterSpacing: 0.8,
     textTransform: "uppercase",
     color: CW.soft,
     fontFamily: fontFamily.semibold,
   },
-  quickGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
-    marginBottom: 18,
+  seeAllBtn: {},
+  seeAllText: {
+    fontSize: 12,
+    color: CW.mid,
+    fontWeight: "500",
+    fontFamily: fontFamily.medium,
   },
-  quickItem: { alignItems: "center", gap: 6 },
-  quickIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 15,
+
+  /* ── recent list ── */
+  recentList: {
     backgroundColor: CW.bg,
+    borderRadius: 20,
+    overflow: "hidden",
     borderWidth: 1,
     borderColor: CW.border,
-    alignItems: "center",
-    justifyContent: "center",
     ...({
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius: 12,
-      elevation: 3,
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 2,
     } as object),
   },
-  quickLabel: { fontSize: 10, color: CW.mid, fontWeight: "500", fontFamily: fontFamily.medium },
+  recentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: CW.border,
+    marginLeft: 64,
+  },
+  recentLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  recentLogoText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#fff",
+    fontFamily: fontFamily.extrabold,
+  },
+  recentInfo: { flex: 1, gap: 3 },
+  recentCompany: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: CW.text,
+    fontFamily: fontFamily.bold,
+  },
+  recentOffer: {
+    fontSize: 12,
+    color: CW.soft,
+    fontFamily: fontFamily.regular,
+  },
+  recentRight: { alignItems: "flex-end", gap: 3 },
+  recentSavings: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: CW.green,
+    fontFamily: fontFamily.bold,
+  },
+  recentTime: {
+    fontSize: 10,
+    color: CW.soft,
+    fontFamily: fontFamily.regular,
+  },
 
-  /* transactions */
-  recentHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  seeAll: { fontSize: 12, color: CW.soft, fontWeight: "500", fontFamily: fontFamily.medium },
-  txList: {},
-  txRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10 },
-  txBorder: { borderBottomWidth: 1, borderBottomColor: CW.border },
-  txIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  txInfo: { flex: 1 },
-  txName: { fontSize: 14, fontWeight: "500", color: CW.text, fontFamily: fontFamily.medium },
-  txDetail: { fontSize: 11, color: CW.soft, marginTop: 1, fontFamily: fontFamily.regular },
-  txAmount: { fontSize: 14, fontWeight: "500", color: CW.text, fontFamily: fontFamily.medium },
-  txPos: { color: CW.green },
+  /* empty */
+  empty: {
+    backgroundColor: CW.bg,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: CW.border,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: CW.soft,
+    textAlign: "center",
+    fontFamily: fontFamily.regular,
+  },
 
   pressed: { opacity: 0.7 },
 });
