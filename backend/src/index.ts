@@ -1,11 +1,18 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import path from "node:path";
+import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 
+import { registerAdminRoutes } from "./admin";
 import { createLlmCouponGenerator } from "./coupons/llmCouponGenerator";
 import { prisma } from "./db";
-import { couponRequestSchema, merchantListQuerySchema } from "./schemas";
+import {
+  analyticsEventSchema,
+  couponRequestSchema,
+  merchantListQuerySchema,
+} from "./schemas";
 import type { MerchantSummary } from "./types";
 
 dotenv.config({ quiet: true });
@@ -28,6 +35,8 @@ app.use(
   }),
 );
 app.use(express.json());
+app.use("/admin", express.static(path.join(process.cwd(), "public/admin")));
+registerAdminRoutes(app, prisma);
 
 app.get("/health", (_request, response) => {
   response.json({ ok: true });
@@ -77,6 +86,21 @@ app.post("/coupons/generate", async (request, response, next) => {
   }
 });
 
+app.post("/analytics/events", async (request, response, next) => {
+  try {
+    const event = analyticsEventSchema.parse(request.body);
+    await prisma.merchantAnalyticsEvent.create({
+      data: {
+        ...event,
+        metadata: event.metadata ? toJsonObject(event.metadata) : undefined,
+      },
+    });
+    response.status(202).json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use(
   (
     error: unknown,
@@ -112,3 +136,7 @@ app.use(
 app.listen(port, () => {
   console.log(`City Wallet API listening on port ${port}`);
 });
+
+function toJsonObject(value: Record<string, unknown>) {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonObject;
+}

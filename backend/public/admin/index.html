@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>City Wallet Admin</title>
+    <link rel="stylesheet" href="/admin/styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <!-- Background element for glassmorphism vibes -->
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+
+    <div id="auth-view" class="view">
+      <div class="auth-container glass">
+        <h1>City Wallet Admin</h1>
+        <form id="auth-form">
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input id="email" type="email" autocomplete="email" required placeholder="name@company.com" />
+          </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input id="password" type="password" autocomplete="current-password" minlength="8" required placeholder="••••••••" />
+          </div>
+          <p id="auth-status" class="status">Please sign in</p>
+          <div class="auth-actions">
+            <button type="submit" class="btn-primary">Log In</button>
+            <button type="button" id="signup-button" class="btn-ghost">Create Account</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="dashboard-view" class="view hidden">
+      <aside class="sidebar glass">
+        <div class="sidebar-header">
+          <h2>City Wallet</h2>
+          <small id="user-email-display"></small>
+        </div>
+        <nav class="nav-links">
+          <a href="#store" class="nav-item active" data-target="view-store">Store Setup</a>
+          <a href="#rules" class="nav-item" data-target="view-rules">Coupon Rules</a>
+          <a href="#analytics" class="nav-item" data-target="view-analytics">Analytics</a>
+        </nav>
+        <div class="sidebar-footer">
+          <button type="button" id="logout-button" class="btn-ghost" style="width: 100%">Sign Out</button>
+        </div>
+      </aside>
+
+      <main class="dashboard-content">
+        <section id="view-store" class="dashboard-section glass active">
+          <header class="section-header">
+            <h2>Store configuration</h2>
+          </header>
+          <form id="merchant-form" class="minimal-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Name</label>
+                <input id="merchant-name" required placeholder="Store Name" />
+              </div>
+              <div class="form-group">
+                <label>Category</label>
+                <input id="merchant-category" placeholder="Cafe, retail..." required />
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label>City ID</label>
+                <input id="merchant-city" value="linz-demo" required />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Lat</label>
+                <input id="merchant-latitude" type="number" step="0.0001" value="48.3069" required />
+              </div>
+              <div class="form-group">
+                <label>Lon</label>
+                <input id="merchant-longitude" type="number" step="0.0001" value="14.2868" required />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Description</label>
+              <textarea id="merchant-description" rows="3" required placeholder="Describe your store..."></textarea>
+            </div>
+            
+            <button type="submit" class="btn-primary">Save Configuration</button>
+          </form>
+        </section>
+
+        <section id="view-rules" class="dashboard-section glass hidden">
+          <header class="section-header">
+            <h2>Campaign parameters</h2>
+            <label class="toggle-switch">
+              <input id="rules-active" type="checkbox" checked />
+              <span class="slider"></span>
+              <span class="toggle-label">Campaign Active</span>
+            </label>
+          </header>
+          
+          <form id="rules-form" class="minimal-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Max Discount (%)</label>
+                <input id="max-discount" type="number" min="0" max="100" value="15" required />
+              </div>
+              <div class="form-group">
+                <label>Validity (min)</label>
+                <input id="validity-minutes" type="number" min="1" max="1440" value="15" required />
+              </div>
+              <div class="form-group">
+                <label>Tone</label>
+                <input id="tone" value="friendly and concise" required />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Allowed Windows</label>
+              <textarea id="allowed-windows" rows="2" placeholder="e.g. Any open business hours">Any open business hours</textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Exclusions</label>
+              <textarea id="exclusions" rows="2" placeholder="e.g. Alcohol, discounted items"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Extra Instructions</label>
+              <textarea id="extra-instructions" rows="2" placeholder="Optional context for LLM"></textarea>
+            </div>
+
+            <button type="submit" class="btn-primary">Update Parameters</button>
+          </form>
+        </section>
+
+        <section id="view-analytics" class="dashboard-section glass hidden">
+          <header class="section-header">
+            <h2>Performance</h2>
+          </header>
+          
+          <div class="metrics-grid">
+            <div class="metric-block">
+              <span class="metric-value text-gradient" id="metric-recommended">0</span>
+              <span class="metric-label">Recommended</span>
+            </div>
+            <div class="metric-block">
+              <span class="metric-value text-gradient" id="metric-generated">0</span>
+              <span class="metric-label">Generated</span>
+            </div>
+            <div class="metric-block">
+              <span class="metric-value text-gradient" id="metric-accepted">0</span>
+              <span class="metric-label">Accepted</span>
+            </div>
+            <div class="metric-block">
+              <span class="metric-value text-gradient" id="metric-redeemed">0</span>
+              <span class="metric-label">Redeemed</span>
+            </div>
+          </div>
+          
+          <div class="conversion-rates">
+            <p id="conversion-rates">Waiting for activity...</p>
+          </div>
+
+          <div class="events-log">
+            <h3>Event Stream</h3>
+            <ul id="recent-events" class="events-list"></ul>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/admin/app.js" defer></script>
+  </body>
+</html>

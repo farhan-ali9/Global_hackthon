@@ -11,13 +11,14 @@
     "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "start:migrate": "prisma migrate deploy && node dist/index.js",
-    "test": "npm run typecheck && npm run simulate:user-context -- --durationMinutes=1 --stepSeconds=60",
+    "test": "npm run typecheck && npm run simulate:user-context -- --durationMinutes=1 --stepSeconds=60 && npm run smoke:admin",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "simulate:user-context": "tsx scripts/simulate-user-context.ts"
+    "simulate:user-context": "tsx scripts/simulate-user-context.ts",
+    "smoke:admin": "tsx scripts/smoke-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",
