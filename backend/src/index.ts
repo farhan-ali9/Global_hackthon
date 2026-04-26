@@ -62,8 +62,8 @@ app.get("/merchants", async (request, response, next) => {
       }
       summaries.push({
         id: merchant.id,
-        name: merchant.name || getMerchantName(merchant.description),
-        category: merchant.category.toLowerCase(),
+        name: merchant.name ?? getMerchantName(merchant.description),
+        category: getMerchantCategory(merchant.description, merchant.category),
         description: merchant.description,
         cityId: merchant.cityId,
         coordinates: {
@@ -172,6 +172,24 @@ function toJsonObject(value: Record<string, unknown>) {
 
 function getMerchantName(description: string) {
   return description.split(" — ")[0] ?? description;
+}
+
+function getMerchantCategory(description: string, rawCategory: string | null | undefined) {
+  if (typeof rawCategory === "string" && rawCategory.trim().length > 0) {
+    return rawCategory.toLowerCase();
+  }
+
+  const normalizedDescription = description.toLowerCase();
+  if (normalizedDescription.includes("coffee") || normalizedDescription.includes("cafe")) {
+    return "coffee";
+  }
+  if (normalizedDescription.includes("bakery") || normalizedDescription.includes("bread")) {
+    return "bakery";
+  }
+  if (normalizedDescription.includes("restaurant") || normalizedDescription.includes("lunch")) {
+    return "restaurant";
+  }
+  return "local";
 }
 
 function withRequestId(error: unknown, requestId: string) {

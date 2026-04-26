@@ -16,6 +16,7 @@ export type LlmCouponGeneratorConfig = {
 const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 const COUPON_TTL_MS = 15 * 60 * 1000;
 const LOG_PREFIX = "[coupon-generator]";
+const OPENROUTER_REQUEST_TIMEOUT_MS = 20_000;
 
 const SYSTEM_PROMPT = `You generate a single local coupon as JSON.
 
@@ -134,17 +135,12 @@ export function createLlmCouponGenerator(
         userIntent,
       };
 
-      await prisma.merchantAnalyticsEvent.create({
-        data: {
-          merchantId: merchant.id,
-          type: "COUPON_GENERATED",
-          metadata: toJsonObject({
-            userIntent: userIntent ?? null,
-            discountPercent: generatedCoupon.discountPercent ?? null,
-            saving: generatedCoupon.saving,
-            context,
-          }),
-        },
+      await recordCouponGeneratedAnalytics(prisma, {
+        merchantId: merchant.id,
+        userIntent,
+        discountPercent: generatedCoupon.discountPercent,
+        saving: generatedCoupon.saving,
+        context,
       });
 
       console.info(`${LOG_PREFIX} coupon generated`, {
@@ -199,21 +195,44 @@ async function callOpenRouter(args: OpenRouterArgs): Promise<LlmCouponPayload> {
     baseUrl: args.baseUrl,
   });
 
-  const response = await fetch(`${args.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${args.apiKey}`,
-    },
-    body: JSON.stringify({
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OPENROUTER_REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${args.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${args.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: args.model,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: args.system },
+          { role: "user", content: args.user },
+        ],
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    const isTimeout = error instanceof Error && error.name === "AbortError";
+    console.error(`${LOG_PREFIX} OpenRouter unreachable`, {
+      merchantId: args.merchantId,
       model: args.model,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: args.system },
-        { role: "user", content: args.user },
-      ],
-    }),
-  });
+      baseUrl: args.baseUrl,
+      reason: isTimeout ? "timeout" : "network_error",
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw httpError(
+      502,
+      isTimeout
+        ? `OpenRouter request timed out after ${OPENROUTER_REQUEST_TIMEOUT_MS}ms`
+        : "OpenRouter is unreachable from backend",
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
@@ -254,15 +273,12 @@ async function callOpenRouter(args: OpenRouterArgs): Promise<LlmCouponPayload> {
     );
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch (error) {
+  const parsed = extractJsonPayload(content);
+  if (parsed === null) {
     console.error(`${LOG_PREFIX} OpenRouter returned invalid JSON`, {
       merchantId: args.merchantId,
       model: args.model,
       contentPreview: truncate(content, 1_000),
-      error: error instanceof Error ? error.message : String(error),
     });
     throw httpError(502, "OpenRouter returned invalid JSON");
   }
@@ -326,9 +342,49 @@ function extractMessageContent(value: unknown) {
     return null;
   }
 
-  return typeof choice.message.content === "string"
-    ? choice.message.content
-    : null;
+  const content = choice.message.content;
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    const textChunks = content
+      .map((chunk) => {
+        if (
+          typeof chunk === "object" &&
+          chunk !== null &&
+          "type" in chunk &&
+          chunk.type === "text" &&
+          "text" in chunk &&
+          typeof chunk.text === "string"
+        ) {
+          return chunk.text;
+        }
+        return null;
+      })
+      .filter((chunk): chunk is string => chunk !== null);
+    return textChunks.length > 0 ? textChunks.join("\n") : null;
+  }
+  return null;
+}
+
+function extractJsonPayload(content: string) {
+  const trimmed = content.trim();
+  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const candidate = fenceMatch ? fenceMatch[1].trim() : trimmed;
+
+  try {
+    return JSON.parse(candidate) as unknown;
+  } catch {
+    const jsonObjectMatch = candidate.match(/\{[\s\S]*\}/);
+    if (!jsonObjectMatch) {
+      return null;
+    }
+    try {
+      return JSON.parse(jsonObjectMatch[0]) as unknown;
+    } catch {
+      return null;
+    }
+  }
 }
 
 function stringifyForLog(value: unknown) {
@@ -336,5 +392,55 @@ function stringifyForLog(value: unknown) {
     return JSON.stringify(value);
   } catch {
     return String(value);
+  }
+}
+
+async function recordCouponGeneratedAnalytics(
+  prisma: PrismaClient,
+  args: {
+    merchantId: string;
+    userIntent: string;
+    discountPercent: number | undefined;
+    saving: GeneratedCouponResponse["saving"];
+    context: Record<string, unknown>;
+  },
+) {
+  const analyticsDelegate = (
+    prisma as unknown as {
+      merchantAnalyticsEvent?: {
+        create: (input: {
+          data: {
+            merchantId: string;
+            type: "COUPON_GENERATED";
+            metadata: Prisma.InputJsonObject;
+          };
+        }) => Promise<unknown>;
+      };
+    }
+  ).merchantAnalyticsEvent;
+
+  if (!analyticsDelegate?.create) {
+    console.warn(`${LOG_PREFIX} skipping coupon analytics event: delegate unavailable`);
+    return;
+  }
+
+  try {
+    await analyticsDelegate.create({
+      data: {
+        merchantId: args.merchantId,
+        type: "COUPON_GENERATED",
+        metadata: toJsonObject({
+          userIntent: args.userIntent,
+          discountPercent: args.discountPercent ?? null,
+          saving: args.saving,
+          context: args.context,
+        }),
+      },
+    });
+  } catch (error) {
+    console.warn(`${LOG_PREFIX} failed to record coupon analytics event`, {
+      merchantId: args.merchantId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
