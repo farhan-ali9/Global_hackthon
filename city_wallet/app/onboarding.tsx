@@ -1,5 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
 import { useRouter, type Href } from "expo-router";
+
+type IoniconsName = ComponentProps<typeof Ionicons>["name"];
 import { useRef, useState } from "react";
 import {
   Animated,
@@ -19,100 +22,100 @@ import { CW, fontFamily } from "@/src/theme/tokens";
 
 type Question = {
   id: string;
-  emoji: string;
+  icon: IoniconsName;
   title: string;
   subtitle: string;
-  multi: boolean;       // allow multiple selections
-  options: { id: string; label: string; emoji: string }[];
+  multi: boolean;
+  options: { id: string; label: string; icon: IoniconsName }[];
 };
 
 const QUESTIONS: Question[] = [
   {
     id: "gender",
-    emoji: "👤",
+    icon: "person-outline",
     title: "How do you identify?",
     subtitle: "We use this to personalise your offers",
     multi: false,
     options: [
-      { id: "male",      label: "Male",            emoji: "♂️" },
-      { id: "female",    label: "Female",           emoji: "♀️" },
-      { id: "nonbinary", label: "Non-binary",       emoji: "⚧️" },
-      { id: "other",     label: "Prefer not to say", emoji: "🤐" },
+      { id: "male",      label: "Male",             icon: "male-outline" },
+      { id: "female",    label: "Female",            icon: "female-outline" },
+      { id: "nonbinary", label: "Non-binary",        icon: "transgender-outline" },
+      { id: "other",     label: "Prefer not to say", icon: "lock-closed-outline" },
     ],
   },
   {
     id: "age",
-    emoji: "🎂",
+    icon: "calendar-outline",
     title: "What's your age group?",
     subtitle: "Helps us show relevant local services",
     multi: false,
     options: [
-      { id: "u18",   label: "Under 18", emoji: "🧒" },
-      { id: "18-25", label: "18 – 25",  emoji: "🧑" },
-      { id: "26-35", label: "26 – 35",  emoji: "👨" },
-      { id: "36-50", label: "36 – 50",  emoji: "🧔" },
-      { id: "50+",   label: "50+",      emoji: "👴" },
+      { id: "u18",   label: "Under 18", icon: "happy-outline" },
+      { id: "18-25", label: "18 – 25",  icon: "person-outline" },
+      { id: "26-35", label: "26 – 35",  icon: "person-outline" },
+      { id: "36-50", label: "36 – 50",  icon: "person-outline" },
+      { id: "50+",   label: "50+",      icon: "accessibility-outline" },
     ],
   },
   {
     id: "hobbies",
-    emoji: "🎯",
+    icon: "grid-outline",
     title: "What are your hobbies?",
     subtitle: "Pick as many as you like",
     multi: true,
     options: [
-      { id: "sports",   label: "Sports",   emoji: "⚽" },
-      { id: "music",    label: "Music",    emoji: "🎵" },
-      { id: "arts",     label: "Arts",     emoji: "🎨" },
-      { id: "gaming",   label: "Gaming",   emoji: "🎮" },
-      { id: "cooking",  label: "Cooking",  emoji: "🍳" },
-      { id: "travel",   label: "Travel",   emoji: "✈️" },
-      { id: "reading",  label: "Reading",  emoji: "📚" },
-      { id: "outdoors", label: "Outdoors", emoji: "🌲" },
+      { id: "sports",   label: "Sports",   icon: "football-outline" },
+      { id: "music",    label: "Music",    icon: "musical-notes-outline" },
+      { id: "arts",     label: "Arts",     icon: "color-palette-outline" },
+      { id: "gaming",   label: "Gaming",   icon: "game-controller-outline" },
+      { id: "cooking",  label: "Cooking",  icon: "restaurant-outline" },
+      { id: "travel",   label: "Travel",   icon: "airplane-outline" },
+      { id: "reading",  label: "Reading",  icon: "book-outline" },
+      { id: "outdoors", label: "Outdoors", icon: "leaf-outline" },
     ],
   },
   {
     id: "food",
-    emoji: "🍽️",
+    icon: "restaurant-outline",
     title: "Food preferences?",
     subtitle: "So we can show you the right restaurant deals",
     multi: true,
     options: [
-      { id: "omnivore",    label: "No restrictions", emoji: "🍖" },
-      { id: "vegetarian",  label: "Vegetarian",      emoji: "🥗" },
-      { id: "vegan",       label: "Vegan",            emoji: "🌱" },
-      { id: "glutenfree",  label: "Gluten-free",      emoji: "🌾" },
-      { id: "halal",       label: "Halal",            emoji: "☪️" },
-      { id: "kosher",      label: "Kosher",           emoji: "✡️" },
+      { id: "omnivore",   label: "No restrictions", icon: "checkmark-circle-outline" },
+      { id: "vegetarian", label: "Vegetarian",       icon: "leaf-outline" },
+      { id: "vegan",      label: "Vegan",            icon: "flower-outline" },
+      { id: "glutenfree", label: "Gluten-free",      icon: "ban-outline" },
+      { id: "halal",      label: "Halal",            icon: "star-outline" },
+      { id: "kosher",     label: "Kosher",           icon: "shield-outline" },
     ],
   },
   {
     id: "transport",
-    emoji: "🚌",
+    icon: "bus-outline",
     title: "How do you get around?",
     subtitle: "We'll highlight transit offers for your style",
     multi: false,
     options: [
-      { id: "walk",    label: "Walking",        emoji: "🚶" },
-      { id: "bike",    label: "Cycling",        emoji: "🚴" },
-      { id: "transit", label: "Public transit", emoji: "🚇" },
-      { id: "car",     label: "Car",            emoji: "🚗" },
-      { id: "mixed",   label: "Mixed",          emoji: "🔀" },
+      { id: "walk",    label: "Walking",        icon: "walk-outline" },
+      { id: "bike",    label: "Cycling",        icon: "bicycle-outline" },
+      { id: "transit", label: "Public transit", icon: "train-outline" },
+      { id: "car",     label: "Car",            icon: "car-outline" },
+      { id: "mixed",   label: "Mixed",          icon: "shuffle-outline" },
     ],
   },
   {
     id: "interests",
-    emoji: "💡",
+    icon: "bulb-outline",
     title: "What offers interest you most?",
     subtitle: "Pick your top categories",
     multi: true,
     options: [
-      { id: "food_out",   label: "Food & Dining",  emoji: "🍔" },
-      { id: "fashion",    label: "Fashion",         emoji: "👗" },
-      { id: "entertain",  label: "Entertainment",   emoji: "🎬" },
-      { id: "wellness",   label: "Wellness",        emoji: "🧘" },
-      { id: "travel_d",   label: "Travel",          emoji: "🌍" },
-      { id: "tech",       label: "Tech & Gadgets",  emoji: "📱" },
+      { id: "food_out",  label: "Food & Dining",  icon: "fast-food-outline" },
+      { id: "fashion",   label: "Fashion",         icon: "shirt-outline" },
+      { id: "entertain", label: "Entertainment",   icon: "film-outline" },
+      { id: "wellness",  label: "Wellness",        icon: "heart-outline" },
+      { id: "travel_d",  label: "Travel",          icon: "earth-outline" },
+      { id: "tech",      label: "Tech & Gadgets",  icon: "phone-portrait-outline" },
     ],
   },
 ];
@@ -237,9 +240,11 @@ export default function OnboardingQuestionnaire() {
           { transform: [{ translateX: slideAnim }] },
         ]}
       >
-        {/* Emoji + heading */}
+        {/* Icon + heading */}
         <View style={styles.questionHeader}>
-          <Text style={styles.questionEmoji}>{q.emoji}</Text>
+          <View style={styles.questionIconWrap}>
+            <Ionicons name={q.icon} size={28} color={CW.text} />
+          </View>
           <Text style={styles.questionTitle}>{q.title}</Text>
           <Text style={styles.questionSub}>{q.subtitle}</Text>
           {q.multi && (
@@ -267,7 +272,12 @@ export default function OnboardingQuestionnaire() {
                 ]}
                 onPress={() => toggleOption(opt.id)}
               >
-                <Text style={styles.optionEmoji}>{opt.emoji}</Text>
+                <Ionicons
+                  name={opt.icon}
+                  size={22}
+                  color={isSelected ? "#fff" : CW.text}
+                  style={styles.optionIcon}
+                />
                 <Text
                   style={[
                     styles.optionLabel,
@@ -369,9 +379,16 @@ const styles = StyleSheet.create({
   questionHeader: {
     marginBottom: 22,
   },
-  questionEmoji: {
-    fontSize: 38,
-    marginBottom: 10,
+  questionIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: CW.bgAlt,
+    borderWidth: 1,
+    borderColor: CW.border,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
   },
   questionTitle: {
     fontSize: 26,
@@ -433,8 +450,7 @@ const styles = StyleSheet.create({
     opacity: 0.85,
     transform: [{ scale: 0.97 }],
   },
-  optionEmoji: {
-    fontSize: 24,
+  optionIcon: {
     marginBottom: 8,
   },
   optionLabel: {
