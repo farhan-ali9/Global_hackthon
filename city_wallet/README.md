@@ -1,139 +1,66 @@
 # City Wallet App
 
-Expo Go-compatible mobile app for the City Wallet demo. The app collects
-device-side context, ranks nearby merchants, and calls the backend to generate
-Groq-powered coupons.
+This app is meant to be built locally from Xcode for iPhone demos and pointed at
+the deployed DigitalOcean backend.
 
-## Running Locally
+## Local Commands
+
+Install dependencies and sync iOS pods:
 
 ```bash
+cd /Users/davidklingbeil2/Documents/Hackathon/Global_hackthon/city_wallet
 npm install
+npx pod-install
+```
+
+Start Metro for debug-only work:
+
+```bash
 npm start
 ```
 
-Open the project with Expo Go from the Metro output.
-
-The `development` EAS build profile is also Metro-based and intended for local
-debugging.
-
-## Environment
-
-Create a local `.env` file from `.env.example`:
+Open the iOS workspace:
 
 ```bash
-cp .env.example .env
+open ios/citywallet.xcworkspace
 ```
 
-Default:
+## Xcode Demo Build
 
-```bash
-EXPO_PUBLIC_API_BASE_URL=http://localhost:4000
-EXPO_PUBLIC_ON_DEVICE_MODEL_ID=Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf
-EXPO_PUBLIC_ENABLE_LOCAL_MODEL=false
-```
+1. Create `city_wallet/.env` from `.env.example`.
+2. Set `EXPO_PUBLIC_API_BASE_URL` to your DigitalOcean backend URL.
+3. Open the workspace in Xcode.
+4. Select your personal signing team.
+5. Use a `Release` scheme build for the demo.
+6. Install to your iPhone from Xcode.
 
-For the always-on mobile app, create a preview env file from the template and
-replace the API URL with your DigitalOcean App Platform URL:
+For a standalone demo build, Metro must not be part of the dependency path. Use
+`Release`, not `Debug`.
 
-```bash
-cp .env.preview.example .env.preview
-```
+## Network Behavior
 
-If `EXPO_PUBLIC_API_BASE_URL` is omitted, the app attempts to derive the backend
-host from the Expo/Metro host in development, then falls back to simulator and
-emulator defaults. For Expo Go on a physical device, explicitly using your
-computer's LAN IP is still the most predictable setup:
+- `Release` build:
+  the phone talks directly to `EXPO_PUBLIC_API_BASE_URL`
+- `Debug` build:
+  the phone talks to Metro on your laptop and is only suitable for development
 
-```bash
-EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
-```
+## App Env Vars
 
-## Structure
+These are build-time values. Change them in `.env`, then rebuild from Xcode.
 
-- `app/_layout.tsx` - Starts the app-wide user-context coupon loop.
-- `app/index.tsx` - Onboarding entry point for the wallet demo.
-- `app/offers/[id].tsx` - Plain offer detail and accept action.
-- `app/redeem/[id].tsx` - Plain redemption token/status screen.
-- `src/context-engine/ContextProvider.ts` - Device context provider for
-  location, time, weather placeholder, and derived intent signals.
-- `src/context-engine/LocalMerchantRecommender.ts` - Adapter boundary and
-  fallback logic for local merchant ranking.
-- `src/context-engine/ReactNativeAiMerchantModelClient.native.ts` - Native
-  React Native AI/GGUF merchant-selection model client for custom dev builds.
-- `src/context-engine/UserContextLoopProvider.tsx` - App-wide 10-second loop
-  that refreshes context, fetches merchants, and asks the local model/fallback
-  to choose a merchant.
-- `src/lib/api.ts` - Backend API client.
-- `src/lib/demoState.ts` - In-memory handoff between demo screens.
-- `src/storage/userProfileStorage.ts` - SQLite-backed local onboarding profile
-  storage, including the display name shown on the home screen.
-- `src/types/city-wallet.ts` - API contracts shared by the mobile app.
+| Variable | Purpose |
+| --- | --- |
+| `EXPO_PUBLIC_API_BASE_URL` | Backend URL used by the app. |
+| `EXPO_PUBLIC_ON_DEVICE_MODEL_ID` | GGUF model identifier for the native on-device recommender. |
+| `EXPO_PUBLIC_ENABLE_LOCAL_MODEL` | Mainly relevant for development builds. |
+| `GOOGLE_MAPS_API_KEY` | Android native map key. |
 
-## Context Coupon Loop
+## Current Flow
 
-The root layout wraps the app in `UserContextLoopProvider`. On mount, and then
-every 10 seconds, the provider:
+1. The app builds private context on device.
+2. It fetches merchant candidates from the backend.
+3. It ranks merchants locally.
+4. It requests coupon generation from the backend.
+5. The backend returns typed coupon JSON for rendering.
 
-1. Builds a `UserContext` with precise coordinates, local time, timezone,
-   coordinate-derived city/zone ids, weather bucket/details, stored onboarding
-   profile answers, intent labels, and demand tags.
-2. Calls `GET /merchants?cityId=<id>` to retrieve merchant candidates for the
-   user's broad city.
-3. Calls `recommendMerchant({ context, merchants })` in
-   `LocalMerchantRecommender.ts`. Native builds register the React Native
-   AI/GGUF implementation at app startup when
-   `EXPO_PUBLIC_ENABLE_LOCAL_MODEL=true`; Expo Go, web, and unconfigured dev
-   builds use the deterministic nearest-merchant fallback.
-4. Calls `POST /coupons/generate` with `{ merchantId, userIntent, context }` so
-   the backend can generate a typed coupon through Groq.
-
-## Always-On Preview Build
-
-Use the `preview` EAS profile for a real installable app that works without
-Metro or the same local network. The profile is internal distribution, uses the
-`preview` EAS Update channel, and enables the local native model in the build
-environment.
-
-Set the DigitalOcean API URL in EAS before building:
-
-```bash
-eas env:create --environment preview --name EXPO_PUBLIC_API_BASE_URL --value https://<your-app>.ondigitalocean.app --visibility plaintext
-eas env:create --environment preview --name GOOGLE_MAPS_API_KEY --value <your-google-maps-key> --visibility sensitive
-```
-
-Build and install:
-
-```bash
-eas build --profile preview --platform all
-```
-
-Publish JS-only fixes to installed preview builds:
-
-```bash
-eas update --channel preview --message "Describe the update"
-```
-
-## How to Work With It
-
-- Keep UI minimal until the backend/context path is stable.
-- Backend work happens in `../backend/`; the app only calls the API.
-- Context work should replace the placeholder weather provider with a real local
-  or API-backed weather source.
-- Add new supported city bounding boxes in `ContextProvider.ts` when the backend
-  is seeded with additional `cityId` values.
-- Native AI work requires a custom Expo dev build or prebuild with
-  `EXPO_PUBLIC_ENABLE_LOCAL_MODEL=true` because Expo Go cannot load the
-  llama.rn native module.
-- Backend generation returns typed coupon JSON, not remote executable UI code.
-
-## Checks
-
-```bash
-npm run lint
-npx tsc --noEmit
-```
-
-## Current Scope
-
-This scaffold does not yet implement real context signals or production push
-notification delivery.
+The backend contract lives in [api.ts](/Users/davidklingbeil2/Documents/Hackathon/Global_hackthon/city_wallet/src/lib/api.ts:1).

@@ -89,7 +89,7 @@ export async function registerForPushNotifications(): Promise<PermissionResult> 
     const { data: token } = await Notifications.getExpoPushTokenAsync();
     return { granted: true, token };
   } catch {
-    // No projectId / Expo Go environment — local notifications still work.
+    // Remote push is not configured in this runtime, but local notifications still work.
     return { granted: true, token: null };
   }
 }

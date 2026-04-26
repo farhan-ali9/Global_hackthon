@@ -1,151 +1,60 @@
 # City Wallet Backend
 
-Small TypeScript API for the City Wallet demo. It exposes a list of merchants
-in a broad area and generates a per-merchant coupon by calling an LLM
-(Groq) under each merchant's markdown rules. No user data is persisted.
+The backend is the always-on part of the demo. It serves:
 
-## Setup
+- `GET /health`
+- `GET /merchants`
+- `POST /coupons/generate`
+- `/admin` for the merchant admin UI
+
+## Local Run Commands
 
 ```bash
+cd /Users/davidklingbeil2/Documents/Hackathon/Global_hackthon/backend
 cp .env.example .env
 npm install
-```
-
-Start Postgres from the repo root:
-
-```bash
-docker compose up -d db
-```
-
-Prepare and seed the database:
-
-```bash
 npm run db:migrate
 npm run db:seed
-```
-
-Run the API:
-
-```bash
 npm run dev
 ```
 
-The API runs on `http://localhost:4000` by default.
+The local API listens on `http://localhost:4000` by default.
 
-## Context Pipeline Simulation
+## Production Startup
 
-Run a 10-minute virtual movement simulation (fast by default, no coupon generation):
-
-```bash
-npm run simulate:user-context
-```
-
-Useful flags:
-
-- `--realtime` — actually waits the full 10 minutes.
-- `--durationMinutes=10` — set simulation duration.
-- `--stepSeconds=20` — set step cadence.
-- `--apiBaseUrl=http://localhost:4000` — override API target.
-
-## Environment
-
-- `DATABASE_URL` — Postgres connection string.
-- `PORT` — API port. DigitalOcean App Platform provides this at runtime.
-- `CORS_ORIGIN` — Allowed origin, or `*` for local hackathon development.
-- `GROQ_API_KEY` — required. Groq API key for coupon generation.
-- `GROQ_MODEL` — model slug. Defaults to `llama-3.1-8b-instant`.
-- `GROQ_BASE_URL` — optional OpenAI-compatible Groq base URL. Defaults to
-  `https://api.groq.com/openai/v1`.
-- `SEED_DEMO_DATA` — set to `true` in production to seed demo merchants during
-  container startup after migrations run.
-
-## Endpoints
-
-### `GET /health`
-
-Returns `{ "ok": true }`.
-
-### `GET /merchants?cityId=<id>`
-
-Returns the list of merchants in a broad area. The `cityId` query parameter
-is optional; when omitted, all merchants are returned. Merchant `rules` are
-intentionally **not** included — they're merchant strategy data the server
-keeps private.
+The production entrypoint is:
 
 ```bash
-curl http://localhost:4000/merchants?cityId=linz-demo
+npm run start:production
 ```
 
-```json
-[
-  {
-    "id": "merchant-cafe-traxlmayr",
-    "description": "Cafe Traxlmayr — classic Linz coffee house near the Landstrasse...",
-    "cityId": "linz-demo",
-    "coordinates": { "latitude": 48.3069, "longitude": 14.2868 }
-  }
-]
-```
+It does three things in order:
 
-### `POST /coupons/generate`
+1. `prisma migrate deploy`
+2. optional demo seed when `SEED_DEMO_DATA=true`
+3. start `dist/src/index.js`
 
-Body:
+The Dockerfile uses that entrypoint and defaults `PORT=8080`.
 
-```json
-{
-  "merchantId": "merchant-cafe-traxlmayr",
-  "userIntent": "want_coffee",
-  "context": { "weather": "rain", "timeOfDay": "morning" }
-}
-```
+## DigitalOcean Runtime Env Vars
 
-`context` is a free-form JSON object the device sends. `userIntent` is the next
-intent chosen by the local device model, and `merchantId` is the merchant chosen
-by that same local model. The server forwards those values to Groq along
-with the merchant and authoritative markdown rules loaded from backend
-configuration for that merchant. Response:
+| Variable | Scope | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | Runtime secret | Postgres connection string. |
+| `PORT` | Runtime | Express listen port. |
+| `CORS_ORIGIN` | Runtime | Browser CORS allowlist. |
+| `GROQ_API_KEY` | Runtime secret | Required Groq API key. |
+| `GROQ_MODEL` | Runtime | Groq model slug. |
+| `GROQ_BASE_URL` | Runtime | Groq OpenAI-compatible base URL. |
+| `SEED_DEMO_DATA` | Startup runtime | Seeds merchants on container start when `true`. |
 
-```json
-{
-  "merchantId": "merchant-cafe-traxlmayr",
-  "merchant": {
-    "id": "merchant-cafe-traxlmayr",
-    "description": "Cafe Traxlmayr — classic Linz coffee house near the Landstrasse...",
-    "cityId": "linz-demo",
-    "coordinates": { "latitude": 48.3069, "longitude": 14.2868 }
-  },
-  "headline": "Rainy-day pick-me-up",
-  "body": "Step in for a warm single-origin espresso — 15% off until 14:00.",
-  "saving": {
-    "type": "percentage",
-    "value": 15,
-    "displayText": "15% off"
-  },
-  "discountPercent": 15,
-  "ctaLabel": "Redeem now",
-  "explanationTags": ["rain", "morning", "quiet-hours"],
-  "expiresAt": "2026-04-25T11:00:00.000Z",
-  "userIntent": "want_coffee"
-}
-```
+## DigitalOcean Deploy
 
-The coupon is not persisted — generation is stateless.
+Start from:
 
-## DigitalOcean Notes
+- [.do/app.yaml.example](/Users/davidklingbeil2/Documents/Hackathon/Global_hackthon/.do/app.yaml.example)
 
-The Dockerfile is set up for DigitalOcean App Platform:
-
-- `PORT=8080` by default.
-- `GET /health` is the App Platform health check.
-- `npm run start:production` runs `prisma migrate deploy`, optionally seeds demo
-  data when `SEED_DEMO_DATA=true`, then starts `dist/src/index.js`.
-- The admin UI is served by the same backend under `/admin`.
-
-Use the root `.do/app.yaml.example` as the App Platform starting point. Set
-`DATABASE_URL` from the App Platform Postgres binding and keep `GROQ_API_KEY` as
-a secret.
-
-Useful production checks:
+After deploy, verify:
 
 ```bash
 curl https://<your-app>.ondigitalocean.app/health

@@ -1,14 +1,20 @@
 # City Wallet Hackathon
 
-City Wallet is the DSV-Gruppe Generative City Wallet hackathon project. The repo
-has two packages:
+City Wallet has two deployable parts:
 
-- `backend/` - TypeScript/Postgres API for merchant lookup and coupon generation.
-- `city_wallet/` - Expo mobile app with Expo Go, dev-client, and EAS preview build paths.
+- `backend/` - Express API, admin UI, Prisma migrations, and Groq coupon generation.
+- `city_wallet/` - Expo React Native app built locally with Xcode for iPhone demos.
 
-## Local Startup
+## Recommended Demo Setup
 
-Start Postgres and the backend:
+- Deploy `backend/` and Postgres to DigitalOcean App Platform.
+- Build the iPhone app locally from Xcode in `Release`.
+- Point the app at the DigitalOcean backend with `EXPO_PUBLIC_API_BASE_URL`.
+- Do not rely on Metro for the demo unless you are explicitly testing a debug build.
+
+## Local Run Commands
+
+Backend:
 
 ```bash
 docker compose up -d db
@@ -19,46 +25,65 @@ npm run db:seed
 npm run dev
 ```
 
-In another terminal, start the Expo app:
+App debug workflow with Metro:
 
 ```bash
 cd city_wallet
 npm install
+npx pod-install
 npm start
 ```
 
-Use Expo Go or a local development build from the Metro output. If testing on a
-physical phone, set `EXPO_PUBLIC_API_BASE_URL` to your computer's LAN IP instead
-of `localhost`.
+If you want to run the iOS app from Xcode against Metro, open:
 
-## Project Structure
+- [citywallet.xcworkspace](/Users/davidklingbeil2/Documents/Hackathon/Global_hackthon/city_wallet/ios/citywallet.xcworkspace/contents.xcworkspacedata)
 
-- `backend/prisma/` - Postgres schema, migration, and seed data.
-- `backend/src/` - Express API, request schemas, admin routes, and Groq coupon
-  generator.
-- `city_wallet/app/` - Minimal generate, offer detail, and redemption screens.
-- `city_wallet/src/context-engine/` - Placeholder local anonymized-context
-  provider.
-- `city_wallet/src/lib/` - API client and in-memory demo handoff state.
-- `city_wallet/src/types/` - Mobile API contracts.
+## Xcode Build Commands
 
-## Flow
+Prepare the app config before building:
 
-1. The mobile context provider builds an anonymized user context.
-2. The app fetches seeded merchants from the backend.
-3. The app ranks merchants locally from device context.
-4. The app sends `{ merchantId, userIntent, context }` to `POST /coupons/generate`.
-5. The backend calls Groq with merchant rules and returns typed coupon JSON.
+```bash
+cd city_wallet
+cp .env.example .env
+```
 
-## DigitalOcean
+Set at least:
 
-The always-on setup is:
+```env
+EXPO_PUBLIC_API_BASE_URL=https://<your-app>.ondigitalocean.app
+EXPO_PUBLIC_ON_DEVICE_MODEL_ID=Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf
+EXPO_PUBLIC_ENABLE_LOCAL_MODEL=false
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+```
 
-- DigitalOcean App Platform hosts the backend API and admin UI.
-- DigitalOcean Managed Postgres stores merchants, rules, sessions, and analytics.
-- An EAS `preview` internal distribution build is the installable mobile app.
+Then sync iOS dependencies:
 
-To prepare the DigitalOcean app spec:
+```bash
+cd city_wallet
+npm install
+npx pod-install
+open ios/citywallet.xcworkspace
+```
+
+In Xcode:
+
+1. Select the `citywallet` target.
+2. Set `Signing & Capabilities` to your personal Apple ID team.
+3. If needed, change the bundle identifier to a unique value.
+4. Set the scheme to `Release` for a standalone demo build.
+5. Select your iPhone and press Run.
+
+Important:
+
+- `Release` is the standalone demo build. It does not need Metro.
+- `Debug` is the development build. It expects Metro to be available.
+- `EXPO_PUBLIC_*` values are compiled into the app bundle. If you change them, rebuild the app from Xcode.
+
+## DigitalOcean Deployment
+
+Use App Platform plus Managed Postgres.
+
+Create the app spec:
 
 ```bash
 cp .do/app.yaml.example .do/app.yaml
@@ -67,50 +92,68 @@ cp .do/app.yaml.example .do/app.yaml
 Edit `.do/app.yaml`:
 
 - Replace `CHANGE_ME_GITHUB_OWNER/CHANGE_ME_REPO`.
-- Replace `CHANGE_ME_MANAGED_POSTGRES_CLUSTER` with the DigitalOcean Managed
-  Postgres cluster name.
-- Replace `CHANGE_ME_GROQ_API_KEY` or set `GROQ_API_KEY` as an encrypted secret
-  in the App Platform UI.
+- Replace `CHANGE_ME_MANAGED_POSTGRES_CLUSTER`.
+- Replace `CHANGE_ME_GROQ_API_KEY`, or enter `GROQ_API_KEY` in the App Platform UI as a secret.
 
-Deploy with the DigitalOcean UI or `doctl`:
+Deploy:
 
 ```bash
 doctl apps create --spec .do/app.yaml
 ```
 
-The backend container listens on `PORT=8080`, exposes `GET /health`, runs
-`prisma migrate deploy`, and seeds demo merchants when `SEED_DEMO_DATA=true`.
-After deployment, verify:
+The backend container:
+
+- listens on `PORT=8080`
+- runs `prisma migrate deploy`
+- seeds demo merchants when `SEED_DEMO_DATA=true`
+- starts the API and admin UI from the same service
+
+Verify after deploy:
 
 ```bash
 curl https://<your-app>.ondigitalocean.app/health
 curl "https://<your-app>.ondigitalocean.app/merchants?cityId=linz-demo"
 ```
 
-## Mobile Preview Build
+## Network Model
 
-The local `development` EAS profile is for Metro-based debugging. For a real
-installable app that works anywhere without your laptop, use the `preview`
-profile.
+Use this when choosing how to demo:
 
-Configure the preview API URL in EAS before building:
+- `Xcode Release` on iPhone:
+  The app talks directly to `EXPO_PUBLIC_API_BASE_URL`. Your laptop is not needed after install.
+- `Xcode Debug` on iPhone:
+  The app needs Metro running on your laptop. Use the same network or tunnel as usual.
+- Backend on DigitalOcean:
+  The phone reaches the backend over the public internet. No shared Wi-Fi is required.
 
-```bash
-cd city_wallet
-eas env:create --environment preview --name EXPO_PUBLIC_API_BASE_URL --value https://<your-app>.ondigitalocean.app --visibility plaintext
-eas env:create --environment preview --name GOOGLE_MAPS_API_KEY --value <your-google-maps-key> --visibility sensitive
-```
+## Env Vars And Scope
 
-Then build and install:
+### App build-time scope
 
-```bash
-eas build --profile preview --platform all
-```
+These live in `city_wallet/.env` and are compiled into the native app bundle when you build from Xcode:
 
-The preview profile is internal distribution, not a development client, so it
-bundles JavaScript and does not need Metro. It uses the `preview` EAS Update
-channel. JS-only fixes can be published to installed preview builds with:
+| Variable | Scope | Purpose |
+| --- | --- | --- |
+| `EXPO_PUBLIC_API_BASE_URL` | App build-time | Public base URL the iPhone app calls for backend requests. |
+| `EXPO_PUBLIC_ON_DEVICE_MODEL_ID` | App build-time | GGUF model identifier used by the on-device model client. |
+| `EXPO_PUBLIC_ENABLE_LOCAL_MODEL` | App build-time | Enables the local model in development-style builds; `Release` builds register the native path regardless of this flag. |
+| `GOOGLE_MAPS_API_KEY` | Native config generation | Used by the Android native map config. It is not currently wired to an iOS Google Maps setup in this repo. |
 
-```bash
-eas update --channel preview --message "Describe the update"
-```
+### Backend runtime scope
+
+These live in DigitalOcean App Platform service env vars or `backend/.env` locally:
+
+| Variable | Scope | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | Backend runtime secret | Prisma connection string for Postgres. |
+| `PORT` | Backend runtime | Port the Express server listens on. App Platform injects this. |
+| `CORS_ORIGIN` | Backend runtime | Allowed browser origin list. `*` is acceptable for this demo backend. |
+| `GROQ_API_KEY` | Backend runtime secret | Required API key for coupon generation. |
+| `GROQ_MODEL` | Backend runtime | Groq model name. |
+| `GROQ_BASE_URL` | Backend runtime | Groq-compatible OpenAI base URL. |
+| `SEED_DEMO_DATA` | Backend startup runtime | When `true`, seeds demo merchants during container startup after migrations. |
+
+## Repo Notes
+
+- [backend/README.md](/Users/davidklingbeil2/Documents/Hackathon/Global_hackthon/backend/README.md) contains backend-specific run and deploy details.
+- [city_wallet/README.md](/Users/davidklingbeil2/Documents/Hackathon/Global_hackthon/city_wallet/README.md) contains app-specific local build notes.
