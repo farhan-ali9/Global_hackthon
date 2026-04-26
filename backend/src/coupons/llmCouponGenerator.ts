@@ -56,7 +56,7 @@ export function createLlmCouponGenerator(
         baseUrl,
         apiKey: config.apiKey,
         model: config.model,
-        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${merchant.rules}`,
+        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${merchant.rules ?? ""}`,
         user: buildUserMessage(merchant, context),
       });
 
@@ -76,17 +76,17 @@ export function createLlmCouponGenerator(
 function buildUserMessage(
   merchant: {
     id: string;
-    description: string;
+    description?: string | null;
     cityId: string;
-    latitude: number;
-    longitude: number;
+    latitude?: number | null;
+    longitude?: number | null;
   },
   context: Record<string, unknown>,
 ) {
   return [
-    `Merchant: ${merchant.description}`,
+    `Merchant: ${merchant.description ?? merchant.id}`,
     `City: ${merchant.cityId}`,
-    `Coordinates: ${merchant.latitude}, ${merchant.longitude}`,
+    `Coordinates: ${merchant.latitude ?? 0}, ${merchant.longitude ?? 0}`,
     "",
     "User context (anonymised, device-supplied):",
     JSON.stringify(context, null, 2),

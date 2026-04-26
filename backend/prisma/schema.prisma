@@ -36,11 +36,15 @@ enum RedemptionStatus {
 
 model Merchant {
   id             String           @id
-  name           String
-  category       MerchantCategory
+  name           String           @default("")
+  description    String?
+  category       MerchantCategory @default(CAFE)
   cityId         String
-  zoneId         String
-  distanceMeters Int
+  zoneId         String           @default("")
+  distanceMeters Int              @default(0)
+  latitude       Float?
+  longitude      Float?
+  rules          String?
   active         Boolean          @default(true)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -48,6 +52,8 @@ model Merchant {
   demandSignals  DemandSignal[]
   offers         Offer[]
   redemptions    Redemption[]
+
+  @@index([cityId])
 }
 
 model MerchantRule {

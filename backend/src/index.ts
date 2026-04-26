@@ -53,11 +53,11 @@ app.get("/merchants", async (request, response, next) => {
 
     const summaries: MerchantSummary[] = merchants.map((merchant) => ({
       id: merchant.id,
-      description: merchant.name,
+      description: merchant.description ?? merchant.name,
       cityId: merchant.cityId,
       coordinates: {
-        latitude: 0,
-        longitude: 0,
+        latitude: merchant.latitude ?? 0,
+        longitude: merchant.longitude ?? 0,
       },
     }));
 
