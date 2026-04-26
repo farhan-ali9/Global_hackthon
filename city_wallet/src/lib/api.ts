@@ -6,7 +6,60 @@ import type {
   MerchantSummary,
   RedemptionResponse,
 } from "@/src/types/city-wallet";
+export type WeatherBucket = "clear" | "cloudy" | "rain" | "cold" | "hot";
 
+export type WeatherContextResponse = {
+  location: {
+    lat: number;
+    lon: number;
+  };
+  weather: {
+    temperature: number;
+    condition: string;
+    description: string;
+    weatherBucket: WeatherBucket;
+  };
+};
+
+export async function getWeatherFromGps(
+  lat: number,
+  lon: number,
+): Promise<WeatherContextResponse> {
+  const apiKey = process.env.EXPO_PUBLIC_OPENWEATHER_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Missing EXPO_PUBLIC_OPENWEATHER_API_KEY");
+  }
+
+  const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`;
+
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Weather request failed");
+  }
+
+  const temperature = data.main.temp;
+  const condition = data.weather[0].main.toLowerCase();
+
+  let weatherBucket: WeatherBucket = "clear";
+
+  if (temperature <= 12) weatherBucket = "cold";
+  else if (temperature >= 28) weatherBucket = "hot";
+  else if (condition.includes("rain")) weatherBucket = "rain";
+  else if (condition.includes("cloud")) weatherBucket = "cloudy";
+
+  return {
+    location: { lat, lon },
+    weather: {
+      temperature,
+      condition: data.weather[0].main,
+      description: data.weather[0].description,
+      weatherBucket,
+    },
+  };
+}
 const apiBaseUrl =
   process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
   "http://localhost:4000";

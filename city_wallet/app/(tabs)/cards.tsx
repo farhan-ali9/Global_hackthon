@@ -14,8 +14,8 @@ const CARDS = [
   },
   {
     label: "Civic Identity Card",
-    num: "ID: DE-MCH-2041-9923",
-    sub: "Munich · Born 1990",
+    num: "ID: AT-LNZ-2041-9923",
+    sub: "Linz · Born 1990",
     bg: "#2d4a3e",
     tag: "CIVIC ID",
   },

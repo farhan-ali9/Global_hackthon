@@ -12,7 +12,7 @@ import { CW, fontFamily } from "@/src/theme/tokens";
 
 const { latitude: lat, longitude: lon } = USER_LOCATION;
 
-// Bounding box: ~1.5 km around Marienplatz
+// Bounding box: central Linz around the current fallback/user location.
 const EMBED_SRC =
   `https://www.openstreetmap.org/export/embed.html` +
   `?bbox=${lon - 0.018},${lat - 0.012},${lon + 0.018},${lat + 0.012}` +

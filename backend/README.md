@@ -54,16 +54,16 @@ intentionally **not** included — they're merchant strategy data the server
 keeps private.
 
 ```bash
-curl http://localhost:4000/merchants?cityId=stuttgart-demo
+curl http://localhost:4000/merchants?cityId=linz-demo
 ```
 
 ```json
 [
   {
-    "id": "merchant-cafe-mueller",
-    "description": "Cafe Mueller — small specialty coffee bar on Schlossplatz...",
-    "cityId": "stuttgart-demo",
-    "coordinates": { "latitude": 48.7784, "longitude": 9.1801 }
+    "id": "merchant-cafe-traxlmayr",
+    "description": "Cafe Traxlmayr — classic Linz coffee house near the Landstrasse...",
+    "cityId": "linz-demo",
+    "coordinates": { "latitude": 48.3069, "longitude": 14.2868 }
   }
 ]
 ```
@@ -74,7 +74,7 @@ Body:
 
 ```json
 {
-  "merchantId": "merchant-cafe-mueller",
+  "merchantId": "merchant-cafe-traxlmayr",
   "context": { "weather": "rain", "intent": "want_coffee", "timeOfDay": "morning" }
 }
 ```

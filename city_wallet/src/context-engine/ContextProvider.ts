@@ -1,6 +1,7 @@
 import * as Location from "expo-location";
-
+import { getWeatherFromGps } from "@/src/lib/api";
 import type {
+  Coordinates,
   IntentLabel,
   TimeOfDay,
   UserContext,
@@ -12,26 +13,78 @@ export type ContextProvider = {
   getUserContext: () => Promise<UserContext>;
 };
 
+let cachedWeather: WeatherSituation | null = null;
 const DEFAULT_COORDINATES = {
-  latitude: 48.7784,
-  longitude: 9.1801,
+  latitude: 48.3069,
+  longitude: 14.2868,
 };
 
-const DEFAULT_CITY_ID = "stuttgart-demo";
-const DEFAULT_ZONE_ID = "old-town";
+const DEFAULT_CITY_ID = "linz-demo";
+const DEFAULT_ZONE_ID = "inner-city";
+
+type CityArea = {
+  cityId: string;
+  zoneId: string;
+  bounds: {
+    minLatitude: number;
+    maxLatitude: number;
+    minLongitude: number;
+    maxLongitude: number;
+  };
+};
+
+const SUPPORTED_CITY_AREAS: CityArea[] = [
+  {
+    cityId: "linz-demo",
+    zoneId: "inner-city",
+    bounds: {
+      minLatitude: 48.27,
+      maxLatitude: 48.34,
+      minLongitude: 14.24,
+      maxLongitude: 14.33,
+    },
+  },
+];
 
 export const deviceContextProvider: ContextProvider = {
   async getUserContext() {
     const now = new Date();
     const location = await getCurrentLocation();
     const coordinates = location?.coords ?? DEFAULT_COORDINATES;
-    const weather = getPlaceholderWeather(now);
+    const cityArea = resolveCityArea(coordinates);
+  
+    let weather: WeatherSituation;
+
+    if (cachedWeather) {
+      weather = cachedWeather;
+    } else {
+      const weatherResponse = await getWeatherFromGps(
+        coordinates.latitude,
+        coordinates.longitude,
+      );
+
+      weather = {
+        bucket: weatherResponse.weather.weatherBucket,
+        label: weatherResponse.weather.description,
+        temperatureCelsius: weatherResponse.weather.temperature,
+        precipitationProbability: weatherResponse.weather.condition
+          .toLowerCase()
+          .includes("rain")
+          ? 0.8
+          : 0.1,
+        source: "weather_api",
+      };
+
+      cachedWeather = weather;
+    }
+  console.log("GPS:", coordinates);
+console.log("WEATHER:", weather);
     const timeOfDay = getTimeOfDay(now);
     const dayOfWeek = now.toLocaleDateString("en-US", { weekday: "long" });
 
     return {
-      cityId: DEFAULT_CITY_ID,
-      zoneId: DEFAULT_ZONE_ID,
+      cityId: cityArea.cityId,
+      zoneId: cityArea.zoneId,
       coordinates,
       coordinateAccuracyMeters: location?.coords.accuracy ?? undefined,
       currentTimeIso: now.toISOString(),
@@ -64,6 +117,27 @@ async function getCurrentLocation() {
   } catch {
     return null;
   }
+}
+
+function resolveCityArea(coordinates: Coordinates) {
+  return (
+    SUPPORTED_CITY_AREAS.find((cityArea) => isWithinBounds(coordinates, cityArea)) ??
+    {
+      cityId: DEFAULT_CITY_ID,
+      zoneId: DEFAULT_ZONE_ID,
+    }
+  );
+}
+
+function isWithinBounds(coordinates: Coordinates, cityArea: CityArea) {
+  const { bounds } = cityArea;
+
+  return (
+    coordinates.latitude >= bounds.minLatitude &&
+    coordinates.latitude <= bounds.maxLatitude &&
+    coordinates.longitude >= bounds.minLongitude &&
+    coordinates.longitude <= bounds.maxLongitude
+  );
 }
 
 function getTimeOfDay(date: Date): TimeOfDay {
