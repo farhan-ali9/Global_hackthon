@@ -1,13 +1,19 @@
 {
   "expo": {
     "name": "City Wallet",
-    "slug": "city_wallet",
+    "slug": "city-wallet",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "citywallet",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2de74adc-7764-4b83-b834-de34bde5f067"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dklingbeil.city-wallet"
@@ -49,8 +55,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "2de74adc-7764-4b83-b834-de34bde5f067"
+        "projectId": "d1c7e6e3-97a8-4add-bf60-720bee1a645c"
       }
-    }
+    },
+    "owner": "dklingbeil"
   }
 }

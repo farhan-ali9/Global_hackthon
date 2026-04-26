@@ -1,0 +1,49 @@
+# Copy this file to .do/app.yaml and replace CHANGE_ME values before deploying.
+name: city-wallet
+region: fra
+
+services:
+  - name: api
+    github:
+      repo: CHANGE_ME_GITHUB_OWNER/CHANGE_ME_REPO
+      branch: main
+      deploy_on_push: true
+    source_dir: backend
+    dockerfile_path: backend/Dockerfile
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    routes:
+      - path: /
+    health_check:
+      http_path: /health
+    envs:
+      - key: DATABASE_URL
+        value: ${city-wallet-db.DATABASE_URL}
+        scope: RUN_TIME
+        type: secret
+      - key: GROQ_API_KEY
+        value: CHANGE_ME_GROQ_API_KEY
+        scope: RUN_TIME
+        type: secret
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
+        scope: RUN_TIME
+      - key: GROQ_BASE_URL
+        value: https://api.groq.com/openai/v1
+        scope: RUN_TIME
+      - key: CORS_ORIGIN
+        value: "*"
+        scope: RUN_TIME
+      - key: SEED_DEMO_DATA
+        value: "true"
+        scope: RUN_TIME
+
+databases:
+  - name: city-wallet-db
+    engine: PG
+    version: "16"
+    production: true
+    cluster_name: CHANGE_ME_MANAGED_POSTGRES_CLUSTER
+    db_name: city_wallet
+    db_user: city_wallet

@@ -2,15 +2,16 @@
   "name": "city-wallet-backend",
   "version": "0.1.0",
   "private": true,
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "engines": {
     "node": "24.x"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "prisma generate && tsc",
-    "start": "node dist/index.js",
-    "start:migrate": "prisma migrate deploy && node dist/index.js",
+    "start": "node dist/src/index.js",
+    "start:migrate": "npm run start:production",
+    "start:production": "node scripts/start-production.mjs",
     "test": "npm run typecheck && npm run simulate:user-context -- --durationMinutes=1 --stepSeconds=60 && npm run smoke:admin",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",

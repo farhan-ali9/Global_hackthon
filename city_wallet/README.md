@@ -13,6 +13,9 @@ npm start
 
 Open the project with Expo Go from the Metro output.
 
+The `development` EAS build profile is also Metro-based and intended for local
+debugging.
+
 ## Environment
 
 Create a local `.env` file from `.env.example`:
@@ -27,6 +30,13 @@ Default:
 EXPO_PUBLIC_API_BASE_URL=http://localhost:4000
 EXPO_PUBLIC_ON_DEVICE_MODEL_ID=Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf
 EXPO_PUBLIC_ENABLE_LOCAL_MODEL=false
+```
+
+For the always-on mobile app, create a preview env file from the template and
+replace the API URL with your DigitalOcean App Platform URL:
+
+```bash
+cp .env.preview.example .env.preview
 ```
 
 If `EXPO_PUBLIC_API_BASE_URL` is omitted, the app attempts to derive the backend
@@ -76,6 +86,32 @@ every 10 seconds, the provider:
    builds use the deterministic nearest-merchant fallback.
 4. Calls `POST /coupons/generate` with `{ merchantId, userIntent, context }` so
    the backend can generate a typed coupon through Groq.
+
+## Always-On Preview Build
+
+Use the `preview` EAS profile for a real installable app that works without
+Metro or the same local network. The profile is internal distribution, uses the
+`preview` EAS Update channel, and enables the local native model in the build
+environment.
+
+Set the DigitalOcean API URL in EAS before building:
+
+```bash
+eas env:create --environment preview --name EXPO_PUBLIC_API_BASE_URL --value https://<your-app>.ondigitalocean.app --visibility plaintext
+eas env:create --environment preview --name GOOGLE_MAPS_API_KEY --value <your-google-maps-key> --visibility sensitive
+```
+
+Build and install:
+
+```bash
+eas build --profile preview --platform all
+```
+
+Publish JS-only fixes to installed preview builds:
+
+```bash
+eas update --channel preview --message "Describe the update"
+```
 
 ## How to Work With It
 

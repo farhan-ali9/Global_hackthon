@@ -15,11 +15,13 @@ FROM node:24-alpine
 
 WORKDIR /app
 ENV NODE_ENV=production
+ENV PORT=8080
 
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/package*.json ./
+COPY scripts ./scripts
 
 EXPOSE 8080
-CMD ["npm", "run", "start:migrate"]
+CMD ["npm", "run", "start:production"]

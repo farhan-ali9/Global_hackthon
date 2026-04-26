@@ -56,6 +56,8 @@ Useful flags:
 - `GROQ_MODEL` — model slug. Defaults to `llama-3.1-8b-instant`.
 - `GROQ_BASE_URL` — optional OpenAI-compatible Groq base URL. Defaults to
   `https://api.groq.com/openai/v1`.
+- `SEED_DEMO_DATA` — set to `true` in production to seed demo merchants during
+  container startup after migrations run.
 
 ## Endpoints
 
@@ -131,8 +133,21 @@ The coupon is not persisted — generation is stateless.
 
 ## DigitalOcean Notes
 
-The server listens on `process.env.PORT` and exposes `/health` for App Platform
-health checks. For deployment, point `DATABASE_URL` at DigitalOcean Managed
-Postgres and use `npm run start:migrate` or the included Dockerfile command so
-Prisma migrations run before the API starts. Set `GROQ_API_KEY` as a
-secret env var in App Platform.
+The Dockerfile is set up for DigitalOcean App Platform:
+
+- `PORT=8080` by default.
+- `GET /health` is the App Platform health check.
+- `npm run start:production` runs `prisma migrate deploy`, optionally seeds demo
+  data when `SEED_DEMO_DATA=true`, then starts `dist/src/index.js`.
+- The admin UI is served by the same backend under `/admin`.
+
+Use the root `.do/app.yaml.example` as the App Platform starting point. Set
+`DATABASE_URL` from the App Platform Postgres binding and keep `GROQ_API_KEY` as
+a secret.
+
+Useful production checks:
+
+```bash
+curl https://<your-app>.ondigitalocean.app/health
+curl "https://<your-app>.ondigitalocean.app/merchants?cityId=linz-demo"
+```
