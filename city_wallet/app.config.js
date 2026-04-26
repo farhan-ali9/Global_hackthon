@@ -7,9 +7,22 @@
  */
 module.exports = ({ config }) => ({
   ...config,
+  plugins: [
+    ...(config.plugins ?? []),
+    [
+      "llama.rn",
+      {
+        enableEntitlements: true,
+        entitlementsProfile: "production",
+        forceCxx20: true,
+        enableOpenCLAndHexagon: true,
+      },
+    ],
+  ],
   android: {
     ...config.android,
     config: {
+      ...config.android?.config,
       googleMaps: {
         apiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
       },

@@ -8,6 +8,7 @@ import type {
   WeatherBucket,
   WeatherSituation,
 } from "@/src/types/city-wallet";
+import { getUserProfile } from "@/src/storage/userProfileStorage";
 
 export type ContextProvider = {
   getUserContext: () => Promise<UserContext>;
@@ -81,6 +82,7 @@ export const deviceContextProvider: ContextProvider = {
 console.log("WEATHER:", weather);
     const timeOfDay = getTimeOfDay(now);
     const dayOfWeek = now.toLocaleDateString("en-US", { weekday: "long" });
+    const profile = await getUserProfile();
 
     return {
       cityId: cityArea.cityId,
@@ -99,6 +101,7 @@ console.log("WEATHER:", weather);
       eventTags: [],
       demandTags: getDemandTags(timeOfDay),
       mobilityState: "unknown",
+      profile,
       privacyLevel: "device_precise",
     };
   },
@@ -146,39 +149,6 @@ function getTimeOfDay(date: Date): TimeOfDay {
   if (hour < 15) return "lunch";
   if (hour < 18) return "afternoon";
   return "evening";
-}
-
-function getPlaceholderWeather(date: Date): WeatherSituation {
-  const month = date.getMonth();
-  const hour = date.getHours();
-
-  if (month <= 1 || month === 11) {
-    return {
-      bucket: "cold",
-      label: "Cold city weather",
-      temperatureCelsius: 4,
-      precipitationProbability: 0.25,
-      source: "placeholder",
-    };
-  }
-
-  if (month >= 5 && month <= 7 && hour >= 11 && hour <= 17) {
-    return {
-      bucket: "hot",
-      label: "Warm and bright",
-      temperatureCelsius: 27,
-      precipitationProbability: 0.1,
-      source: "placeholder",
-    };
-  }
-
-  return {
-    bucket: "cloudy",
-    label: "Mild and cloudy",
-    temperatureCelsius: 14,
-    precipitationProbability: 0.2,
-    source: "placeholder",
-  };
 }
 
 function getIntentLabels(
