@@ -53,7 +53,14 @@ export function createLlmCouponGenerator(
   return {
     async generate({ merchantId, context, userIntent }) {
       if (!config.apiKey) {
-        throw missingGeminiConfigError(merchantId, config.model);
+        console.error(`${LOG_PREFIX} missing GROQ_API_KEY`, {
+          merchantId,
+          model: config.model,
+        });
+        throw httpError(
+          503,
+          "Coupon generation is not configured: GROQ_API_KEY is missing",
+        );
       }
 
       console.info(`${LOG_PREFIX} starting coupon generation`, {
@@ -96,8 +103,8 @@ export function createLlmCouponGenerator(
         rules,
       };
 
-      const payload = await callGemini({
-        baseUrl: geminiBaseUrl,
+      const payload = await callLlmApi({
+        baseUrl,
         apiKey: config.apiKey,
         model: config.model,
         system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${configuredMerchant.rules}`,
@@ -182,8 +189,8 @@ type GeminiArgs = {
   merchantId: string;
 };
 
-async function callGemini(args: GeminiArgs): Promise<LlmCouponPayload> {
-  console.info(`${LOG_PREFIX} calling Gemini`, {
+async function callLlmApi(args: OpenRouterArgs): Promise<LlmCouponPayload> {
+  console.info(`${LOG_PREFIX} calling LLM API`, {
     merchantId: args.merchantId,
     model: args.model,
     baseUrl: args.baseUrl,

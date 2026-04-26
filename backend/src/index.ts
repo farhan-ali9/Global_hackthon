@@ -23,8 +23,9 @@ const port = Number(process.env.PORT ?? 4000);
 const corsOrigin = process.env.CORS_ORIGIN ?? "*";
 
 const couponGenerator = createLlmCouponGenerator(prisma, {
-  apiKey: process.env.GEMINI_API_KEY ?? "",
-  model: process.env.GEMINI_MODEL ?? "gemini-1.5-flash",
+  apiKey: process.env.GROQ_API_KEY ?? "",
+  model: process.env.GROQ_MODEL ?? "llama-3.1-8b-instant",
+  baseUrl: "https://api.groq.com/openai/v1",
 });
 
 app.use(
@@ -62,8 +63,8 @@ app.get("/merchants", async (request, response, next) => {
       }
       summaries.push({
         id: merchant.id,
-        name: merchant.name ?? getMerchantName(merchant.description),
-        category: getMerchantCategory(merchant.description, merchant.category),
+        name: merchant.name || getMerchantName(merchant.description),
+        category: (merchant.category ?? "RETAIL").toLowerCase(),
         description: merchant.description,
         cityId: merchant.cityId,
         coordinates: {
@@ -79,10 +80,24 @@ app.get("/merchants", async (request, response, next) => {
   }
 });
 
+const COUPON_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes per merchant
+const couponCache = new Map<string, { coupon: unknown; generatedAt: number }>();
+
 app.post("/coupons/generate", async (request, response, next) => {
   const requestId = crypto.randomUUID();
   try {
     const couponRequest = couponRequestSchema.parse(request.body);
+
+    const cached = couponCache.get(couponRequest.merchantId);
+    if (cached && Date.now() - cached.generatedAt < COUPON_COOLDOWN_MS) {
+      console.info("[coupons.generate] returning cached coupon", {
+        requestId,
+        merchantId: couponRequest.merchantId,
+        ageSeconds: Math.round((Date.now() - cached.generatedAt) / 1000),
+      });
+      return response.status(200).json(cached.coupon);
+    }
+
     console.info("[coupons.generate] request received", {
       requestId,
       merchantId: couponRequest.merchantId,
@@ -90,10 +105,11 @@ app.post("/coupons/generate", async (request, response, next) => {
       contextKeys: Object.keys(couponRequest.context),
     });
     const coupon = await couponGenerator.generate(couponRequest);
+    couponCache.set(couponRequest.merchantId, { coupon, generatedAt: Date.now() });
     console.info("[coupons.generate] request succeeded", {
       requestId,
       merchantId: couponRequest.merchantId,
-      headline: coupon.headline,
+      headline: (coupon as { headline?: string }).headline,
     });
     response.status(201).json(coupon);
   } catch (error) {
