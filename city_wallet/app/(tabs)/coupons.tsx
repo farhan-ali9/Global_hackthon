@@ -1,223 +1,211 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
-import type { GeneratedCouponResponse, MerchantSummary } from "@/src/types/city-wallet";
+import type { GeneratedCouponResponse } from "@/src/types/city-wallet";
 import { CW, fontFamily } from "@/src/theme/tokens";
 
-function formatDistance(m: number) {
-  return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`;
+const ACCENT = "#2563EB";
+const ACCENT_LIGHT = "#EFF6FF";
+const GREEN = "#16A34A";
+const GREEN_LIGHT = "#F0FDF4";
+
+function formatExpiresAt(expiresAt: string) {
+  const date = new Date(expiresAt);
+  if (Number.isNaN(date.getTime())) return "soon";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function MerchantCard({
-  merchant,
-  distanceMeters,
-  isRecommended,
-  coupon,
-}: {
-  merchant: MerchantSummary;
-  distanceMeters: number;
-  isRecommended: boolean;
-  coupon: GeneratedCouponResponse | null;
-}) {
-  const isCouponForMerchant = coupon?.merchantId === merchant.id;
-  const expiresAtLabel = coupon ? formatExpiresAt(coupon.expiresAt) : null;
+function merchantLabel(id: string) {
+  return id
+    .replace("merchant-", "")
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
 
+function DiscountBadge({ saving }: { saving: GeneratedCouponResponse["saving"] }) {
+  const label =
+    saving.type === "percentage"
+      ? `${Math.round(saving.value)}% OFF`
+      : `${saving.currency} ${saving.amount} OFF`;
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoLetter}>M</Text>
+    <View style={styles.discountBadge}>
+      <Text style={styles.discountBadgeText}>{label}</Text>
+    </View>
+  );
+}
+
+function CouponCard({ coupon }: { coupon: GeneratedCouponResponse }) {
+  const expiresLabel = formatExpiresAt(coupon.expiresAt);
+  return (
+    <View style={styles.couponCard}>
+      <View style={styles.couponCardTop}>
+        <View style={styles.couponCardTopLeft}>
+          <Text style={styles.couponMerchant}>{merchantLabel(coupon.merchantId)}</Text>
+          <Text style={styles.couponHeadline}>{coupon.headline}</Text>
         </View>
-        <View style={styles.cardHeaderText}>
-          <Text style={styles.companyName}>{merchant.id.replace("merchant-", "").replaceAll("-", " ")}</Text>
-          <View style={styles.distRow}>
-            <Ionicons name="location-outline" size={11} color="rgba(255,255,255,0.7)" />
-            <Text style={styles.distance}>{formatDistance(distanceMeters)} away</Text>
-          </View>
-        </View>
-        <View style={styles.offerBadge}>
-          <Text style={styles.offerBadgeText}>{isRecommended ? "Recommended" : "Candidate"}</Text>
-        </View>
+        <DiscountBadge saving={coupon.saving} />
       </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.offerDetail}>{merchant.description}</Text>
-        {isCouponForMerchant && coupon ? (
-          <>
-            <Text style={styles.couponHeadline}>{coupon.headline}</Text>
-            <Text style={styles.metaText}>{coupon.body}</Text>
-            <Text style={styles.savingText}>{coupon.saving.displayText}</Text>
-            <Text style={styles.metaText}>
-              CTA: {coupon.ctaLabel} · Expires {expiresAtLabel}
-            </Text>
-          </>
-        ) : (
-          <Text style={styles.metaText}>
-            {isRecommended ? "Generating coupon for this merchant..." : "Waiting for local model pick"}
-          </Text>
-        )}
+
+      <View style={styles.divider} />
+
+      <Text style={styles.couponBody}>{coupon.body}</Text>
+
+      {coupon.explanationTags?.length > 0 && (
+        <View style={styles.tagsRow}>
+          {coupon.explanationTags.map((tag) => (
+            <View key={tag} style={styles.tag}>
+              <Text style={styles.tagText}>{tag}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.couponFooter}>
+        <View style={styles.expiryRow}>
+          <Ionicons name="time-outline" size={13} color={CW.soft} />
+          <Text style={styles.expiryText}>Expires {expiresLabel}</Text>
+        </View>
+        <TouchableOpacity style={styles.ctaBtn} activeOpacity={0.8}>
+          <Text style={styles.ctaBtnText}>{coupon.ctaLabel}</Text>
+        </TouchableOpacity>
       </View>
+    </View>
+  );
+}
+
+function EmptyState({ status, couponError }: { status: string; couponError: string | null }) {
+  const isGenerating = status === "refreshing";
+  return (
+    <View style={styles.emptyState}>
+      {isGenerating ? (
+        <ActivityIndicator size="large" color={ACCENT} />
+      ) : (
+        <Ionicons name="ticket-outline" size={48} color={CW.soft} />
+      )}
+      <Text style={styles.emptyTitle}>
+        {isGenerating ? "Finding the best deal for you…" : "No coupons yet"}
+      </Text>
+      <Text style={styles.emptySubtitle}>
+        {couponError
+          ? couponError
+          : isGenerating
+            ? "Our AI is generating a personalised offer"
+            : "Walk around and the app will suggest relevant offers nearby"}
+      </Text>
     </View>
   );
 }
 
 export default function CouponsScreen() {
   const insets = useSafeAreaInsets();
-  const { context, merchants, recommendation, coupon, couponError, status, error } =
-    useUserContextLoop();
-
-  const merchantsWithDistance = merchants
-    .map((merchant) => ({
-      merchant,
-      distanceMeters: getDistanceMeters(
-        context?.coordinates.latitude ?? merchant.coordinates.latitude,
-        context?.coordinates.longitude ?? merchant.coordinates.longitude,
-        merchant.coordinates.latitude,
-        merchant.coordinates.longitude,
-      ),
-    }))
-    .sort((left, right) => left.distanceMeters - right.distanceMeters);
+  const { coupon, couponError, status } = useUserContextLoop();
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Merchant Pipeline</Text>
-          <Text style={styles.subtitle}>Context + merchant ranking (coupon in loop state)</Text>
-        </View>
-        <View style={styles.countBadge}>
-          <Text style={styles.countText}>{merchants.length}</Text>
-        </View>
+        <Text style={styles.title}>My Coupons</Text>
+        <Text style={styles.subtitle}>AI-picked offers based on where you are</Text>
       </View>
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.statusCard}>
-          <Text style={styles.statusTitle}>Loop status: {status}</Text>
-          <Text style={styles.statusBody}>City: {context?.cityId ?? "n/a"} · Zone: {context?.zoneId ?? "n/a"}</Text>
-          <Text style={styles.statusBody}>Recommended merchant: {recommendation?.merchantId ?? "none yet"}</Text>
-          <Text style={styles.statusBody}>Coupon merchant: {coupon?.merchantId ?? "none yet"}</Text>
-          <Text style={styles.statusBody}>Coupon status: {status === "refreshing" ? "generating" : "ready"}</Text>
-          {coupon ? (
-            <Text style={styles.statusBody}>
-              Saving: {coupon.saving.displayText} · Intent: {coupon.userIntent ?? "n/a"}
-            </Text>
-          ) : null}
-          {couponError ? <Text style={styles.errorText}>{couponError}</Text> : null}
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        </View>
-        {merchantsWithDistance.map(({ merchant, distanceMeters }) => (
-          <MerchantCard
-            key={merchant.id}
-            merchant={merchant}
-            distanceMeters={distanceMeters}
-            isRecommended={recommendation?.merchantId === merchant.id}
-            coupon={coupon}
-          />
-        ))}
-        <View style={{ height: 12 }} />
+        {coupon ? (
+          <>
+            <View style={styles.sectionLabel}>
+              <View style={styles.liveIndicator} />
+              <Text style={styles.sectionLabelText}>Active offer</Text>
+            </View>
+            <CouponCard coupon={coupon} />
+          </>
+        ) : (
+          <EmptyState status={status} couponError={couponError} />
+        )}
+        <View style={{ height: 32 }} />
       </ScrollView>
     </View>
   );
 }
 
-const CARD_RADIUS = 18;
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: CW.bgAlt },
+
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     paddingHorizontal: 22,
-    paddingBottom: 14,
-    paddingTop: 4,
+    paddingBottom: 16,
+    paddingTop: 6,
   },
-  title: { fontSize: 21, fontWeight: "500", letterSpacing: -0.7, color: CW.text, fontFamily: fontFamily.medium },
-  subtitle: { fontSize: 12, color: CW.soft, marginTop: 2, fontFamily: fontFamily.regular },
-  countBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: CW.text,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  countText: { color: "#fff", fontSize: 13, fontWeight: "700", fontFamily: fontFamily.bold },
+  title: { fontSize: 26, fontWeight: "700", letterSpacing: -0.8, color: CW.text, fontFamily: fontFamily.bold },
+  subtitle: { fontSize: 13, color: CW.soft, marginTop: 3, fontFamily: fontFamily.regular },
 
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, gap: 14 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 4, gap: 12 },
 
-  /* Card */
-  card: {
-    borderRadius: CARD_RADIUS,
+  sectionLabel: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 2 },
+  liveIndicator: { width: 8, height: 8, borderRadius: 4, backgroundColor: GREEN },
+  sectionLabelText: { fontSize: 12, fontWeight: "600", color: GREEN, fontFamily: fontFamily.semibold, textTransform: "uppercase", letterSpacing: 0.5 },
+
+  /* Coupon card */
+  couponCard: {
     backgroundColor: CW.bg,
-    overflow: "hidden",
-    ...({
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.08,
-      shadowRadius: 16,
-      elevation: 4,
-    } as object),
-  },
+    borderRadius: 20,
+    padding: 20,
+    gap: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 5,
+  } as object,
+  couponCardTop: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  couponCardTopLeft: { flex: 1, gap: 4 },
+  couponMerchant: { fontSize: 12, fontWeight: "600", color: ACCENT, fontFamily: fontFamily.semibold, textTransform: "uppercase", letterSpacing: 0.4 },
+  couponHeadline: { fontSize: 20, fontWeight: "700", color: CW.text, fontFamily: fontFamily.bold, letterSpacing: -0.4, lineHeight: 26 },
+  couponBody: { fontSize: 14, color: CW.soft, fontFamily: fontFamily.regular, lineHeight: 20 },
 
-  /* Header */
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
-    backgroundColor: CW.text,
+  discountBadge: {
+    backgroundColor: ACCENT,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: "flex-start",
+    flexShrink: 0,
   },
-  logoCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  discountBadgeText: { color: "#fff", fontSize: 13, fontWeight: "800", fontFamily: fontFamily.extrabold },
+
+  divider: { height: 1, backgroundColor: CW.border },
+
+  tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  tag: { backgroundColor: ACCENT_LIGHT, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  tagText: { fontSize: 11, color: ACCENT, fontFamily: fontFamily.semibold },
+
+  couponFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  expiryRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  expiryText: { fontSize: 12, color: CW.soft, fontFamily: fontFamily.regular },
+  ctaBtn: {
+    backgroundColor: ACCENT,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  ctaBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: fontFamily.bold },
+
+  /* Empty */
+  emptyState: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingTop: 80,
+    gap: 16,
+    paddingHorizontal: 32,
   },
-  logoLetter: { fontSize: 20, fontWeight: "800", color: "#fff", fontFamily: fontFamily.extrabold },
-  cardHeaderText: { flex: 1 },
-  companyName: { fontSize: 15, fontWeight: "700", color: "#fff", fontFamily: fontFamily.bold },
-  distRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
-  distance: { fontSize: 11, color: "rgba(255,255,255,0.7)", fontFamily: fontFamily.regular },
-
-  offerBadge: {
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    flexShrink: 0,
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  offerBadgeText: { fontSize: 11, fontWeight: "800", fontFamily: fontFamily.extrabold, color: "#fff" },
-
-  cardBody: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  offerDetail: { fontSize: 14, fontWeight: "600", color: CW.text, fontFamily: fontFamily.bold },
-  couponHeadline: { fontSize: 15, fontWeight: "700", color: CW.text, fontFamily: fontFamily.bold },
-  savingText: { fontSize: 12, color: CW.text, fontFamily: fontFamily.semibold },
-  metaText: { fontSize: 11, color: CW.soft, fontFamily: fontFamily.regular, flex: 1 },
-  statusCard: {
-    backgroundColor: CW.bg,
-    borderRadius: 14,
-    borderColor: CW.border,
-    borderWidth: 1,
-    padding: 12,
-    gap: 6,
-  },
-  statusTitle: { color: CW.text, fontFamily: fontFamily.bold, fontSize: 13 },
-  statusBody: { color: CW.soft, fontFamily: fontFamily.regular, fontSize: 12 },
-  errorText: { color: "#9c2a2a", fontFamily: fontFamily.medium, fontSize: 12 },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: CW.text, fontFamily: fontFamily.bold, textAlign: "center" },
+  emptySubtitle: { fontSize: 14, color: CW.soft, fontFamily: fontFamily.regular, textAlign: "center", lineHeight: 20 },
 });
 
 function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -230,12 +218,4 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) ** 2;
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-}
-
-function formatExpiresAt(expiresAt: string) {
-  const date = new Date(expiresAt);
-  if (Number.isNaN(date.getTime())) {
-    return "soon";
-  }
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
