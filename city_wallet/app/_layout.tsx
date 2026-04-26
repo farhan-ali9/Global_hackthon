@@ -96,6 +96,7 @@ export default function RootLayout() {
             options={{ presentation: "modal", animation: "slide_from_bottom" }}
           />
           <Stack.Screen name="personal-information" options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="notifications" options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="coupon/[id]" options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="map/index" options={{ animation: "slide_from_bottom" }} />
           <Stack.Screen name="offers/[id]" />

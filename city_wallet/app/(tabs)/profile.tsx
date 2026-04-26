@@ -1,24 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  cancelAllNotifications,
-  registerForPushNotifications,
-  scheduleCouponDigest,
-  sendDemoCouponNotification,
-} from "@/src/services/notifications";
+import { cancelAllNotifications } from "@/src/services/notifications";
 import {
   DEFAULT_AVATAR_COLOR,
   getPersonalInfo,
@@ -33,18 +26,13 @@ const STATS = [
 
 const ACCOUNT_SECTIONS = [
   { title: "Account",     items: ["Personal Information"] },
-  { title: "Preferences", items: ["Language & Region", "Privacy & Data"] },
+  { title: "Preferences", items: ["Language & Region", "Privacy & Data", "Notifications"] },
 ];
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const navigation = useNavigation();
-
-  const [notifEnabled, setNotifEnabled]   = useState(false);
-  const [tokenText, setTokenText]         = useState<string | null>(null);
-  const [registering, setRegistering]     = useState(false);
-  const [sending, setSending]             = useState(false);
 
   const [displayName,  setDisplayName]  = useState("Sofia Müller");
   const [displayCity,  setDisplayCity]  = useState("Linz");
@@ -62,48 +50,6 @@ export default function ProfileScreen() {
       });
     }, []),
   );
-
-  /* Try to auto-register on mount (permission may already be granted) */
-  useEffect(() => {
-    void registerForPushNotifications().then((r) => {
-      if (r.granted) {
-        setNotifEnabled(true);
-        setTokenText(r.token ?? null);
-      }
-    });
-  }, []);
-
-  async function handleNotifToggle(value: boolean) {
-    if (value) {
-      setRegistering(true);
-      const result = await registerForPushNotifications();
-      setRegistering(false);
-      if (result.granted) {
-        setNotifEnabled(true);
-        setTokenText(result.token ?? null);
-      } else {
-        Alert.alert(
-          "Permission required",
-          result.reason + "\n\nOpen Settings → Notifications to enable them.",
-        );
-      }
-    } else {
-      await cancelAllNotifications();
-      setNotifEnabled(false);
-      setTokenText(null);
-    }
-  }
-
-  async function handleTestNotification() {
-    if (!notifEnabled) {
-      Alert.alert("Enable notifications first", "Toggle notifications on above.");
-      return;
-    }
-    setSending(true);
-    await sendDemoCouponNotification();
-    setSending(false);
-    Alert.alert("Sent!", "A demo coupon notification was delivered.");
-  }
 
   function handleSignOut() {
     Alert.alert(
@@ -131,15 +77,6 @@ export default function ProfileScreen() {
         },
       ],
     );
-  }
-
-  async function handleScheduleDigest() {
-    if (!notifEnabled) {
-      Alert.alert("Enable notifications first", "Toggle notifications on above.");
-      return;
-    }
-    await scheduleCouponDigest(10);
-    Alert.alert("Scheduled", "A digest notification will arrive in ~10 seconds.\nBackground the app to see it.");
   }
 
   return (
@@ -177,88 +114,7 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Notifications section ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Notifications</Text>
-          <View style={styles.settingsList}>
-
-            {/* Toggle row */}
-            <View style={[styles.settingsRow, styles.settingsBorder]}>
-              <View style={styles.rowLeft}>
-                <View style={[styles.iconBubble, { backgroundColor: "#e8f5ee" }]}>
-                  <Ionicons name="notifications" size={16} color="#2d6a4f" />
-                </View>
-                <View>
-                  <Text style={styles.settingsItem}>Coupon Alerts</Text>
-                  <Text style={styles.settingsMeta}>
-                    {notifEnabled ? "Notifications are on" : "Tap to enable"}
-                  </Text>
-                </View>
-              </View>
-              {registering
-                ? <ActivityIndicator size="small" color={CW.soft} />
-                : (
-                  <Switch
-                    value={notifEnabled}
-                    onValueChange={handleNotifToggle}
-                    trackColor={{ false: CW.border, true: "#2d6a4f" }}
-                    thumbColor="#fff"
-                  />
-                )}
-            </View>
-
-            {/* Digest row */}
-            <Pressable
-              style={({ pressed }) => [styles.settingsRow, styles.settingsBorder, pressed && styles.pressed]}
-              onPress={handleScheduleDigest}
-            >
-              <View style={styles.rowLeft}>
-                <View style={[styles.iconBubble, { backgroundColor: "#eef3ff" }]}>
-                  <Ionicons name="time" size={16} color="#3355cc" />
-                </View>
-                <View>
-                  <Text style={styles.settingsItem}>Nearby Digest</Text>
-                  <Text style={styles.settingsMeta}>Schedule a digest in 10 s</Text>
-                </View>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </Pressable>
-
-            {/* Test notification button */}
-            <Pressable
-              style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}
-              onPress={handleTestNotification}
-              disabled={sending}
-            >
-              <View style={styles.rowLeft}>
-                <View style={[styles.iconBubble, { backgroundColor: "#fff5e6" }]}>
-                  {sending
-                    ? <ActivityIndicator size="small" color="#cc7700" />
-                    : <Ionicons name="send" size={16} color="#cc7700" />}
-                </View>
-                <View>
-                  <Text style={styles.settingsItem}>Send Test Notification</Text>
-                  <Text style={styles.settingsMeta}>Fires an instant demo alert</Text>
-                </View>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </Pressable>
-          </View>
-
-          {/* Push token chip – shown when notifications are enabled */}
-          {notifEnabled && (
-            <View style={styles.tokenBox}>
-              <Ionicons name="key-outline" size={12} color={CW.soft} />
-              <Text style={styles.tokenText} numberOfLines={1}>
-                {tokenText
-                  ? tokenText.slice(0, 40) + "…"
-                  : "Local only (Expo Go) — dev build needed for remote push"}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* ── Account / Wallet / Preferences ── */}
+        {/* ── Account / Preferences ── */}
         {ACCOUNT_SECTIONS.map((sec, si) => (
           <View key={si} style={styles.section}>
             <Text style={styles.sectionLabel}>{sec.title}</Text>
@@ -272,9 +128,8 @@ export default function ProfileScreen() {
                     pressed && styles.pressed,
                   ]}
                   onPress={() => {
-                    if (item === "Personal Information") {
-                      router.push("/personal-information");
-                    }
+                    if (item === "Personal Information") router.push("/personal-information");
+                    if (item === "Notifications") router.push("/notifications");
                   }}
                 >
                   <Text style={styles.settingsItem}>{item}</Text>
