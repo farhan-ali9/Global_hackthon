@@ -18,10 +18,16 @@ import {
 } from "@/src/storage/userProfileStorage";
 import { CW, fontFamily } from "@/src/theme/tokens";
 
-const STATS = [
-  { l: "Points",   v: "1 240" },
-  { l: "Saved",    v: "€38" },
-  { l: "Redeemed", v: "12" },
+const SAVED_ITEMS = [
+  { label: "Coffee discount",  value: "€3.50",  date: "Today" },
+  { label: "Transit pass",     value: "€12.00", date: "Yesterday" },
+  { label: "Museum entry",     value: "€8.00",  date: "Apr 22" },
+];
+
+const REDEEMED_ITEMS = [
+  { label: "Free coffee",        value: "150 pts", date: "Today" },
+  { label: "10% off bookstore",  value: "200 pts", date: "Apr 20" },
+  { label: "Cinema ticket",      value: "500 pts", date: "Apr 15" },
 ];
 
 const ACCOUNT_SECTIONS = [
@@ -37,6 +43,7 @@ export default function ProfileScreen() {
   const [displayName,  setDisplayName]  = useState("Sofia Müller");
   const [displayCity,  setDisplayCity]  = useState("Linz");
   const [avatarColor,  setAvatarColor]  = useState(DEFAULT_AVATAR_COLOR);
+  const [activeTab,    setActiveTab]    = useState<"saved" | "redeemed">("saved");
 
   /* Reload personal info every time the tab is focused (e.g. after editing) */
   useFocusEffect(
@@ -83,6 +90,7 @@ export default function ProfileScreen() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* ── Profile card ── */}
       <View style={styles.profileCard}>
+        {/* Avatar + name */}
         <View style={styles.profileRow}>
           <Pressable
             style={({ pressed }) => [pressed && { opacity: 0.75 }]}
@@ -99,13 +107,29 @@ export default function ProfileScreen() {
             <Text style={styles.profileSub}>{displayCity ? `${displayCity} resident · ` : ""}Member since 2022</Text>
           </View>
         </View>
-        <View style={styles.statsRow}>
-          {STATS.map((st, i) => (
-            <View key={i} style={styles.statBox}>
-              <Text style={styles.statValue}>{st.v}</Text>
-              <Text style={styles.statLabel}>{st.l}</Text>
-            </View>
-          ))}
+
+        {/* Points display */}
+        <View style={styles.pointsBlock}>
+          <Text style={styles.pointsLabel}>Total Points</Text>
+          <Text style={styles.pointsValue}>1 240</Text>
+        </View>
+
+        {/* Saved / Redeemed tabs */}
+        <View style={styles.tabBar}>
+          <Pressable
+            style={[styles.tab, activeTab === "saved" && styles.tabActive]}
+            onPress={() => setActiveTab("saved")}
+          >
+            <Text style={[styles.tabText, activeTab === "saved" && styles.tabTextActive]}>Saved</Text>
+            <Text style={[styles.tabSub, activeTab === "saved" && styles.tabSubActive]}>€38</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.tab, activeTab === "redeemed" && styles.tabActive]}
+            onPress={() => setActiveTab("redeemed")}
+          >
+            <Text style={[styles.tabText, activeTab === "redeemed" && styles.tabTextActive]}>Redeemed</Text>
+            <Text style={[styles.tabSub, activeTab === "redeemed" && styles.tabSubActive]}>12 offers</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -114,6 +138,23 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Tab content: Saved / Redeemed ── */}
+        <View style={styles.tabContent}>
+          {(activeTab === "saved" ? SAVED_ITEMS : REDEEMED_ITEMS).map((item, i, arr) => (
+            <View
+              key={i}
+              style={[styles.activityRow, i < arr.length - 1 && styles.activityBorder]}
+            >
+              <View style={styles.activityDot} />
+              <View style={styles.activityInfo}>
+                <Text style={styles.activityLabel}>{item.label}</Text>
+                <Text style={styles.activityDate}>{item.date}</Text>
+              </View>
+              <Text style={styles.activityValue}>{item.value}</Text>
+            </View>
+          ))}
+        </View>
+
         {/* ── Account / Preferences ── */}
         {ACCOUNT_SECTIONS.map((sec, si) => (
           <View key={si} style={styles.section}>
@@ -185,29 +226,90 @@ const styles = StyleSheet.create({
   },
   profileSub: { fontSize: 12, color: CW.soft, marginTop: 2, fontFamily: fontFamily.regular },
 
-  statsRow: { flexDirection: "row", gap: 8, marginTop: 16 },
-  statBox: {
+  /* points */
+  pointsBlock: {
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  pointsLabel: {
+    fontSize: 11,
+    color: CW.soft,
+    fontFamily: fontFamily.semibold,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  pointsValue: {
+    fontSize: 42,
+    fontWeight: "700",
+    color: CW.text,
+    fontFamily: fontFamily.bold,
+    letterSpacing: -1.5,
+  },
+
+  /* tabs */
+  tabBar: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    borderTopColor: CW.border,
+  },
+  tab: {
     flex: 1,
     alignItems: "center",
-    backgroundColor: CW.bgAlt,
-    borderRadius: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
   },
-  statValue: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: CW.text,
-    letterSpacing: -0.5,
-    fontFamily: fontFamily.bold,
+  tabActive: {
+    borderBottomColor: CW.text,
   },
-  statLabel: {
-    fontSize: 9,
+  tabText: {
+    fontSize: 13,
+    fontWeight: "500",
     color: CW.soft,
-    textTransform: "uppercase",
-    letterSpacing: 0.7,
-    marginTop: 2,
-    fontFamily: fontFamily.semibold,
+    fontFamily: fontFamily.medium,
   },
+  tabTextActive: {
+    color: CW.text,
+  },
+  tabSub: {
+    fontSize: 11,
+    color: CW.soft,
+    fontFamily: fontFamily.regular,
+    marginTop: 1,
+  },
+  tabSubActive: {
+    color: CW.mid,
+  },
+
+  /* tab content */
+  tabContent: {
+    backgroundColor: CW.bg,
+    borderRadius: CW.r,
+    borderWidth: 1,
+    borderColor: CW.border,
+    overflow: "hidden",
+    marginBottom: 18,
+  },
+  activityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 12,
+  },
+  activityBorder: { borderBottomWidth: 1, borderBottomColor: CW.border },
+  activityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: CW.border,
+    flexShrink: 0,
+  },
+  activityInfo: { flex: 1 },
+  activityLabel: { fontSize: 14, color: CW.text, fontFamily: fontFamily.regular },
+  activityDate:  { fontSize: 11, color: CW.soft, marginTop: 1, fontFamily: fontFamily.regular },
+  activityValue: { fontSize: 14, fontWeight: "600", color: CW.text, fontFamily: fontFamily.semibold },
 
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 22, paddingTop: 16 },
