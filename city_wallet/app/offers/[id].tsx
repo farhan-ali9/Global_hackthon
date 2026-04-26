@@ -2,36 +2,37 @@ import { Link, type Href, useLocalSearchParams } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/src/components/Screen";
-import { demoContextSnapshot, demoMerchant, demoOffer } from "@/src/data/mockData";
+import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
 import { color, fontFamily, radii, shadow } from "@/src/theme/tokens";
 
 export default function OfferDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { recommendation, context } = useUserContextLoop();
 
   return (
     <Screen appBarTitle="Offer">
       <View>
         <Text style={styles.eyebrow}>Generated offer</Text>
-        <Text style={styles.title}>{demoOffer.title}</Text>
-        <Text style={styles.subtitle}>{demoMerchant.name}</Text>
+        <Text style={styles.title}>Generation disabled</Text>
+        <Text style={styles.subtitle}>{recommendation?.merchantId ?? "No merchant recommended yet"}</Text>
       </View>
 
       <View style={styles.panel}>
-        <Text style={styles.hook}>{demoOffer.hook}</Text>
-        <Text style={styles.discount}>{demoOffer.discountPercent}% off</Text>
-        <Text style={styles.body}>{demoOffer.reason}</Text>
+        <Text style={styles.hook}>Pipeline currently stops before coupon creation.</Text>
+        <Text style={styles.discount}>0% off</Text>
+        <Text style={styles.body}>This screen remains as a placeholder until offer generation is enabled.</Text>
       </View>
 
       <View style={styles.panel}>
         <Text style={styles.sectionTitle}>Context snapshot</Text>
         <Text style={styles.body}>
-          {demoContextSnapshot.weather}, {demoContextSnapshot.temperatureCelsius}°C,
-          {` ${demoContextSnapshot.timeOfDay}`}
+          {context?.weather.label ?? "n/a"}, {context?.weather.temperatureCelsius ?? "n/a"} C,{" "}
+          {context?.timeOfDay ?? "n/a"}
         </Text>
-        <Text style={styles.body}>{demoContextSnapshot.demandSignal}</Text>
+        <Text style={styles.body}>Demand tags: {context?.demandTags.join(", ") ?? "n/a"}</Text>
       </View>
 
-      <Link href={`/redeem/${id ?? demoOffer.id}` as Href} asChild>
+      <Link href={`/redeem/${id ?? "pending"}` as Href} asChild>
         <Pressable style={({ pressed }) => [styles.primaryCta, pressed && styles.pressed]}>
           <Text style={styles.primaryCtaText}>Accept and redeem</Text>
         </Pressable>

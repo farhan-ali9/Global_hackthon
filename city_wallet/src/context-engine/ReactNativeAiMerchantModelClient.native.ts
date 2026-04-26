@@ -3,9 +3,12 @@ import {
   getModelPath,
   isModelDownloaded,
   llama,
+  removeModel,
   type LlamaLanguageModel,
 } from "@react-native-ai/llama";
 import { generateText, jsonSchema, Output as AiOutput, type JSONSchema7 } from "ai";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 import type {
   LocalRecommendationRequest,
@@ -55,27 +58,127 @@ let preparedModel: LlamaLanguageModel | null = null;
 let preparedModelId: string | null = null;
 let preparePromise: Promise<LlamaLanguageModel> | null = null;
 let preparingModelId: string | null = null;
+const PIPELINE_LOG_PREVIEW_CHARS = 1400;
+const ENABLE_FULL_PIPELINE_LOGS =
+  process.env.EXPO_PUBLIC_LOCAL_MODEL_PIPELINE_FULL_LOGS?.toLowerCase() === "true";
 
 export function registerReactNativeAiMerchantModelClient() {
+  if (Constants.appOwnership === "expo") {
+    console.info(
+      "Running in Expo Go: skipping on-device merchant model and using fallback recommender.",
+    );
+    return;
+  }
+  const localModelEnabled =
+    process.env.EXPO_PUBLIC_ENABLE_LOCAL_MODEL?.toLowerCase() === "true";
+  if (__DEV__ && !localModelEnabled) {
+    console.info(
+      "Local merchant model disabled in dev build. Set EXPO_PUBLIC_ENABLE_LOCAL_MODEL=true to enable.",
+    );
+    return;
+  }
   setLocalMerchantModelClient(createReactNativeAiMerchantModelClient());
 }
 
 function createReactNativeAiMerchantModelClient(): LocalMerchantModelClient {
   return {
     async recommendMerchant(request) {
+      const requestId = createPipelineRequestId();
       const modelId = getConfiguredModelId();
       const model = await getPreparedModel(modelId);
-      const { output: recommendation } = await generateText({
-        model,
-        prompt: buildLocalModelPrompt(request),
-        temperature: 0.1,
-        maxOutputTokens: 256,
-        output: RESPONSE_OUTPUT,
+      const prompt = buildLocalModelPrompt(request);
+      logModelPipeline("request_start", {
+        requestId,
+        modelId,
+        merchantCount: request.merchants.length,
+        rankingSignalCount: request.localRankingSignals.length,
       });
+      let recommendation: ModelRecommendationPayload;
+      try {
+        recommendation = await generateStructuredRecommendation(model, prompt, modelId, requestId);
+      } catch (structuredError) {
+        recommendation = await generateTextRecommendation(
+          model,
+          prompt,
+          modelId,
+          requestId,
+          structuredError,
+        );
+      }
 
-      return normalizeModelResponse(recommendation, request, modelId);
+      const normalized = normalizeModelResponse(recommendation, request, modelId);
+      logModelPipeline("request_success", { requestId, modelId, normalized });
+      return normalized;
     },
   };
+}
+
+async function generateStructuredRecommendation(
+  model: LlamaLanguageModel,
+  prompt: string,
+  modelId: string,
+  requestId: string,
+) {
+  logModelPipeline("structured_input", { requestId, modelId, promptLength: prompt.length, prompt });
+  const { output } = await generateText({
+    model,
+    prompt,
+    temperature: 0.1,
+    maxOutputTokens: 256,
+    output: RESPONSE_OUTPUT,
+  });
+  logModelPipeline("structured_output", { requestId, modelId, output });
+  return output;
+}
+
+async function generateTextRecommendation(
+  model: LlamaLanguageModel,
+  prompt: string,
+  modelId: string,
+  requestId: string,
+  structuredError: unknown,
+) {
+  console.info(
+    "Structured local-model parsing failed; using tolerant JSON extraction fallback.",
+    structuredError,
+  );
+  const fallbackPrompt = `${prompt}\n\nReturn only one JSON object and nothing else.`;
+  logModelPipeline("fallback_input", {
+    requestId,
+    modelId,
+    structuredError,
+    promptLength: fallbackPrompt.length,
+    prompt: fallbackPrompt,
+  });
+  const { text } = await generateText({
+    model,
+    prompt: fallbackPrompt,
+    temperature: 0.05,
+    maxOutputTokens: 192,
+  });
+  logModelPipeline("fallback_output_raw_text", {
+    requestId,
+    modelId,
+    textLength: text.length,
+    text,
+  });
+
+  const parsed = extractJsonObjectFromText(text);
+  logModelPipeline("fallback_output_parsed_json", { requestId, modelId, parsed });
+  if (!isModelRecommendationPayload(parsed)) {
+    logModelPipeline("request_failure", {
+      requestId,
+      modelId,
+      reason: "fallback_parse_invalid_payload",
+      textLength: text.length,
+      text,
+      parsed,
+    });
+    throw new Error(
+      `Local model returned unparsable recommendation text: ${text.slice(0, 240)}`,
+    );
+  }
+  return parsed;
 }
 
 async function getPreparedModel(modelId: string) {
@@ -106,18 +209,33 @@ async function prepareModel(modelId: string) {
   }
 
   const modelPath = await ensureModelPath(modelId);
-  const model = llama.languageModel(modelPath, {
-    contextParams: {
-      n_ctx: 2048,
-      n_gpu_layers: 99,
-    },
-  });
-
-  await model.prepare();
-  preparedModel = model;
-  preparedModelId = modelId;
-
-  return model;
+  try {
+    const model = await loadModelWithParams(modelPath, getPrimaryContextParams());
+    preparedModel = model;
+    preparedModelId = modelId;
+    return model;
+  } catch (firstError) {
+    console.warn(
+      `Local model primary load failed for "${modelId}". Retrying with repaired download and safer params.`,
+      firstError,
+    );
+    await removeModel(modelId).catch(() => {
+      // Ignore failures; best effort cleanup before redownload.
+    });
+    const repairedPath = await ensureModelPath(modelId);
+    try {
+      const model = await loadModelWithParams(repairedPath, getFallbackContextParams());
+      preparedModel = model;
+      preparedModelId = modelId;
+      return model;
+    } catch (secondError) {
+      throw new Error(
+        `Failed to load model "${modelId}" on device. Primary and fallback loads failed. ${
+          secondError instanceof Error ? secondError.message : String(secondError)
+        }`,
+      );
+    }
+  }
 }
 
 async function ensureModelPath(modelId: string) {
@@ -136,6 +254,84 @@ async function ensureModelPath(modelId: string) {
 
 function getConfiguredModelId() {
   return process.env.EXPO_PUBLIC_ON_DEVICE_MODEL_ID?.trim() || DEFAULT_MODEL_ID;
+}
+
+function createPipelineRequestId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function logModelPipeline(stage: string, payload: Record<string, unknown>) {
+  const formattedPayload = Object.fromEntries(
+    Object.entries(payload).map(([key, value]) => [key, toLogPreview(value)]),
+  );
+  console.info(`[Local model pipeline] ${stage}`, formattedPayload);
+}
+
+function toLogPreview(value: unknown) {
+  if (typeof value === "string") {
+    if (ENABLE_FULL_PIPELINE_LOGS) {
+      return value;
+    }
+    return value.length > PIPELINE_LOG_PREVIEW_CHARS
+      ? `${value.slice(0, PIPELINE_LOG_PREVIEW_CHARS)}…`
+      : value;
+  }
+
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined) {
+      return String(value);
+    }
+    if (ENABLE_FULL_PIPELINE_LOGS) {
+      return serialized;
+    }
+    return serialized.length > PIPELINE_LOG_PREVIEW_CHARS
+      ? `${serialized.slice(0, PIPELINE_LOG_PREVIEW_CHARS)}…`
+      : serialized;
+  } catch {
+    return String(value);
+  }
+}
+
+function extractJsonObjectFromText(text: string) {
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    return null;
+  }
+  try {
+    return JSON.parse(jsonMatch[0]) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function isModelRecommendationPayload(value: unknown): value is ModelRecommendationPayload {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "merchantId" in value &&
+    typeof (value as { merchantId: unknown }).merchantId === "string"
+  );
+}
+
+async function loadModelWithParams(
+  modelPath: string,
+  contextParams: { n_ctx: number; n_gpu_layers: number },
+) {
+  const model = llama.languageModel(modelPath, { contextParams });
+  await model.prepare();
+  return model;
+}
+
+function getPrimaryContextParams() {
+  if (Platform.OS === "ios") {
+    return { n_ctx: 1536, n_gpu_layers: 40 };
+  }
+  return { n_ctx: 1536, n_gpu_layers: 20 };
+}
+
+function getFallbackContextParams() {
+  return { n_ctx: 1024, n_gpu_layers: 0 };
 }
 
 function normalizeModelResponse(

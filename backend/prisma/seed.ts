@@ -91,6 +91,76 @@ const merchants = [
 - Discount applies to the first 2 hours of rental only
 - Never discount e-bike full-day rentals`,
   },
+  {
+    id: "merchant-lentos-cafe",
+    cityId: "linz-demo",
+    latitude: 48.3088,
+    longitude: 14.2879,
+    description:
+      "Lentos Cafe — riverside cafe by the Lentos Kunstmuseum with light lunches, espresso, and terrace seating.",
+    rules: `# Lentos Cafe — coupon rules
+- Maximum discount: 18%
+- Lunch and afternoon slots only (11:00-17:00)
+- Tone: modern and calm, avoid hype language
+- Mention terrace seating when weather is clear
+- Never stack with museum member discounts`,
+  },
+  {
+    id: "merchant-hauptplatz-apotheke",
+    cityId: "linz-demo",
+    latitude: 48.3062,
+    longitude: 14.2851,
+    description:
+      "Hauptplatz Apotheke — central pharmacy at Hauptplatz with wellness essentials and same-day pickup.",
+    rules: `# Hauptplatz Apotheke — coupon rules
+- Maximum discount: 8%
+- Only non-prescription products can be discounted
+- Tone: clear, trustworthy, no casual slang
+- Prioritise wellness and seasonal-care items
+- Never discount prescription medication`,
+  },
+  {
+    id: "merchant-landstrasse-bakery",
+    cityId: "linz-demo",
+    latitude: 48.3005,
+    longitude: 14.2867,
+    description:
+      "Landstrasse Bakery — neighborhood bakery on Landstrasse with breads, pastries, and early commuter breakfast deals.",
+    rules: `# Landstrasse Bakery — coupon rules
+- Maximum discount: 20%
+- Morning and lunch windows only (07:00-13:30)
+- Tone: warm and local
+- Highlight fresh-baked items and commuter timing
+- Never discount pre-ordered celebration cakes`,
+  },
+  {
+    id: "merchant-suedbahnhof-market",
+    cityId: "linz-demo",
+    latitude: 48.2922,
+    longitude: 14.2928,
+    description:
+      "Suedbahnhof Market Stand — fresh produce and local snacks near Suedbahnhofmarkt with rotating daily specials.",
+    rules: `# Suedbahnhof Market Stand — coupon rules
+- Maximum discount: 15%
+- Fresh products only; no alcohol discounts
+- Tone: friendly, practical, short sentences
+- Prefer end-of-day inventory balancing offers
+- Never discount products flagged as premium local imports`,
+  },
+  {
+    id: "merchant-urfahr-books",
+    cityId: "linz-demo",
+    latitude: 48.3146,
+    longitude: 14.2871,
+    description:
+      "Urfahr Books — independent bookstore in Urfahr with contemporary fiction, travel guides, and weekend readings.",
+    rules: `# Urfahr Books — coupon rules
+- Maximum discount: 10%
+- Books only; exclude magazines and gift cards
+- Tone: thoughtful and concise
+- Encourage browsing during rainy or cold weather
+- Never discount newly released bestsellers`,
+  },
 ];
 
 async function main() {

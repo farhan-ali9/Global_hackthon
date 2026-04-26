@@ -32,6 +32,21 @@ npm run dev
 
 The API runs on `http://localhost:4000` by default.
 
+## Context Pipeline Simulation
+
+Run a 10-minute virtual movement simulation (fast by default, no coupon generation):
+
+```bash
+npm run simulate:user-context
+```
+
+Useful flags:
+
+- `--realtime` — actually waits the full 10 minutes.
+- `--durationMinutes=10` — set simulation duration.
+- `--stepSeconds=20` — set step cadence.
+- `--apiBaseUrl=http://localhost:4000` — override API target.
+
 ## Environment
 
 - `DATABASE_URL` — Postgres connection string.

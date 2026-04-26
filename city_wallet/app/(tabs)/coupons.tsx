@@ -1,116 +1,92 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, type Href } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { COUPONS } from "@/src/data/mockData";
-import type { Coupon, CouponCategory } from "@/src/types/city-wallet";
+import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
+import type { MerchantSummary } from "@/src/types/city-wallet";
 import { CW, fontFamily } from "@/src/theme/tokens";
-
-type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
-
-const CATEGORY_ICON: Record<CouponCategory, IoniconsName> = {
-  food:          "restaurant-outline",
-  retail:        "bag-outline",
-  entertainment: "film-outline",
-  wellness:      "fitness-outline",
-  transport:     "bus-outline",
-};
 
 function formatDistance(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`;
 }
 
-function CouponCard({ coupon, onPress }: { coupon: Coupon; onPress: () => void }) {
+function MerchantCard({
+  merchant,
+  distanceMeters,
+  isRecommended,
+}: {
+  merchant: MerchantSummary;
+  distanceMeters: number;
+  isRecommended: boolean;
+}) {
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] }]}
-      onPress={onPress}
-    >
-      {/* Brand color header */}
-      <View style={[styles.cardHeader, { backgroundColor: coupon.brandColor }]}>
-        {/* Logo circle */}
-        <View style={[styles.logoCircle, { backgroundColor: coupon.accentColor }]}>
-          <Text style={styles.logoLetter}>{coupon.logoLetter}</Text>
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={styles.logoCircle}>
+          <Text style={styles.logoLetter}>M</Text>
         </View>
         <View style={styles.cardHeaderText}>
-          <Text style={styles.companyName}>{coupon.company}</Text>
+          <Text style={styles.companyName}>{merchant.id.replace("merchant-", "").replaceAll("-", " ")}</Text>
           <View style={styles.distRow}>
             <Ionicons name="location-outline" size={11} color="rgba(255,255,255,0.7)" />
-            <Text style={styles.distance}>{formatDistance(coupon.distanceMeters)} away</Text>
+            <Text style={styles.distance}>{formatDistance(distanceMeters)} away</Text>
           </View>
         </View>
-
-        {/* Offer badge */}
-        <View style={[styles.offerBadge, { backgroundColor: coupon.accentColor }]}>
-          <Text style={[styles.offerBadgeText, { color: coupon.brandColor }]}>{coupon.offer}</Text>
+        <View style={styles.offerBadge}>
+          <Text style={styles.offerBadgeText}>{isRecommended ? "Recommended" : "Candidate"}</Text>
         </View>
       </View>
-
-      {/* White body */}
       <View style={styles.cardBody}>
-        <View style={styles.cardBodyLeft}>
-          <Text style={styles.offerDetail}>{coupon.offerDetail}</Text>
-          <View style={styles.metaRow}>
-            <Ionicons name={CATEGORY_ICON[coupon.category]} size={11} color={CW.soft} />
-            <Text style={styles.metaText}>{coupon.location}</Text>
-          </View>
-        </View>
-        <View style={styles.cardBodyRight}>
-          <Text style={styles.validLabel}>Valid until</Text>
-          <Text style={styles.validDate}>{coupon.validUntil}</Text>
-          {coupon.savings && (
-            <Text style={styles.savings}>Save {coupon.savings}</Text>
-          )}
-        </View>
+        <Text style={styles.offerDetail}>{merchant.description}</Text>
+        <Text style={styles.metaText}>Offer generation disabled for now.</Text>
       </View>
-
-      {/* Perforated divider */}
-      <View style={styles.perfRow}>
-        <View style={[styles.perfCircle, styles.perfLeft, { backgroundColor: CW.bgAlt }]} />
-        {Array.from({ length: 14 }).map((_, i) => (
-          <View key={i} style={styles.dash} />
-        ))}
-        <View style={[styles.perfCircle, styles.perfRight, { backgroundColor: CW.bgAlt }]} />
-      </View>
-
-      {/* Footer */}
-      <View style={[styles.cardFooter, { backgroundColor: coupon.brandColor + "18" }]}>
-        <Ionicons name="qr-code-outline" size={14} color={coupon.brandColor} />
-        <Text style={[styles.footerText, { color: coupon.brandColor }]}>Tap to view QR code</Text>
-        <Ionicons name="chevron-forward" size={14} color={coupon.brandColor} />
-      </View>
-    </Pressable>
+    </View>
   );
 }
 
 export default function CouponsScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const { context, merchants, recommendation, status, error } = useUserContextLoop();
+  const merchantsWithDistance = merchants
+    .map((merchant) => ({
+      merchant,
+      distanceMeters: getDistanceMeters(
+        context?.coordinates.latitude ?? merchant.coordinates.latitude,
+        context?.coordinates.longitude ?? merchant.coordinates.longitude,
+        merchant.coordinates.latitude,
+        merchant.coordinates.longitude,
+      ),
+    }))
+    .sort((left, right) => left.distanceMeters - right.distanceMeters);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Nearby Coupons</Text>
-          <Text style={styles.subtitle}>Sorted by distance · Linz</Text>
+          <Text style={styles.title}>Merchant Pipeline</Text>
+          <Text style={styles.subtitle}>Context + merchant ranking (no offer generation)</Text>
         </View>
         <View style={styles.countBadge}>
-          <Text style={styles.countText}>{COUPONS.length}</Text>
+          <Text style={styles.countText}>{merchants.length}</Text>
         </View>
       </View>
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {COUPONS.map((c) => (
-          <CouponCard
-            key={c.id}
-            coupon={c}
-            onPress={() => router.push(`/coupon/${c.id}` as Href)}
+        <View style={styles.statusCard}>
+          <Text style={styles.statusTitle}>Loop status: {status}</Text>
+          <Text style={styles.statusBody}>City: {context?.cityId ?? "n/a"} · Zone: {context?.zoneId ?? "n/a"}</Text>
+          <Text style={styles.statusBody}>Recommended merchant: {recommendation?.merchantId ?? "none yet"}</Text>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </View>
+        {merchantsWithDistance.map(({ merchant, distanceMeters }) => (
+          <MerchantCard
+            key={merchant.id}
+            merchant={merchant}
+            distanceMeters={distanceMeters}
+            isRecommended={recommendation?.merchantId === merchant.id}
           />
         ))}
         <View style={{ height: 12 }} />
@@ -167,6 +143,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     gap: 12,
+    backgroundColor: CW.text,
   },
   logoCircle: {
     width: 44,
@@ -175,6 +152,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
   logoLetter: { fontSize: 20, fontWeight: "800", color: "#fff", fontFamily: fontFamily.extrabold },
   cardHeaderText: { flex: 1 },
@@ -187,55 +165,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     flexShrink: 0,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
-  offerBadgeText: { fontSize: 13, fontWeight: "800", fontFamily: fontFamily.extrabold },
+  offerBadgeText: { fontSize: 11, fontWeight: "800", fontFamily: fontFamily.extrabold, color: "#fff" },
 
-  /* Body */
   cardBody: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
+    gap: 8,
   },
-  cardBodyLeft: { flex: 1, gap: 5 },
   offerDetail: { fontSize: 14, fontWeight: "600", color: CW.text, fontFamily: fontFamily.bold },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: { fontSize: 11, color: CW.soft, fontFamily: fontFamily.regular, flex: 1 },
-  cardBodyRight: { alignItems: "flex-end", gap: 2, marginLeft: 8 },
-  validLabel: { fontSize: 9, color: CW.soft, textTransform: "uppercase", letterSpacing: 0.6, fontFamily: fontFamily.semibold },
-  validDate: { fontSize: 11, fontWeight: "600", color: CW.mid, fontFamily: fontFamily.semibold },
-  savings: { fontSize: 11, fontWeight: "700", color: CW.green, marginTop: 2, fontFamily: fontFamily.bold },
-
-  /* Perforated edge */
-  perfRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 0,
-    position: "relative",
-    height: 12,
-  },
-  perfCircle: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    position: "absolute",
-    zIndex: 2,
-  },
-  perfLeft: { left: -7 },
-  perfRight: { right: -7 },
-  dash: {
-    flex: 1,
-    height: 1,
-    backgroundColor: CW.border,
-  },
-
-  /* Footer */
-  cardFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
+  statusCard: {
+    backgroundColor: CW.bg,
+    borderRadius: 14,
+    borderColor: CW.border,
+    borderWidth: 1,
+    padding: 12,
     gap: 6,
   },
-  footerText: { fontSize: 12, fontWeight: "600", fontFamily: fontFamily.semibold },
+  statusTitle: { color: CW.text, fontFamily: fontFamily.bold, fontSize: 13 },
+  statusBody: { color: CW.soft, fontFamily: fontFamily.regular, fontSize: 12 },
+  errorText: { color: "#9c2a2a", fontFamily: fontFamily.medium, fontSize: 12 },
 });
+
+function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}

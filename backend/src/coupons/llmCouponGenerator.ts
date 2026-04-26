@@ -37,13 +37,16 @@ export function createLlmCouponGenerator(
   prisma: PrismaClient,
   config: LlmCouponGeneratorConfig,
 ): LlmCouponGenerator {
-  if (!config.apiKey) {
-    throw new Error("OPENROUTER_API_KEY is required to start the coupon generator");
-  }
   const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
 
   return {
     async generate({ merchantId, context }) {
+      if (!config.apiKey) {
+        throw httpError(
+          503,
+          "Coupon generation is not configured: OPENROUTER_API_KEY is missing",
+        );
+      }
       const merchant = await prisma.merchant.findUnique({
         where: { id: merchantId },
       });
@@ -51,13 +54,26 @@ export function createLlmCouponGenerator(
       if (!merchant) {
         throw httpError(404, `Merchant ${merchantId} not found`);
       }
+      const { description, rules, latitude, longitude } = merchant;
+      if (description === null || rules === null || latitude === null || longitude === null) {
+        throw httpError(500, `Merchant ${merchantId} is missing required configuration`);
+      }
 
       const payload = await callOpenRouter({
         baseUrl,
         apiKey: config.apiKey,
         model: config.model,
-        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${merchant.rules}`,
-        user: buildUserMessage(merchant, context),
+        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${rules}`,
+        user: buildUserMessage(
+          {
+            id: merchant.id,
+            cityId: merchant.cityId,
+            description,
+            latitude,
+            longitude,
+          },
+          context,
+        ),
       });
 
       return {

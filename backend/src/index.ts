@@ -41,15 +41,25 @@ app.get("/merchants", async (request, response, next) => {
       orderBy: { id: "asc" },
     });
 
-    const summaries: MerchantSummary[] = merchants.map((merchant) => ({
-      id: merchant.id,
-      description: merchant.description,
-      cityId: merchant.cityId,
-      coordinates: {
-        latitude: merchant.latitude,
-        longitude: merchant.longitude,
-      },
-    }));
+    const summaries: MerchantSummary[] = [];
+    for (const merchant of merchants) {
+      if (
+        merchant.description === null ||
+        merchant.latitude === null ||
+        merchant.longitude === null
+      ) {
+        continue;
+      }
+      summaries.push({
+        id: merchant.id,
+        description: merchant.description,
+        cityId: merchant.cityId,
+        coordinates: {
+          latitude: merchant.latitude,
+          longitude: merchant.longitude,
+        },
+      });
+    }
 
     response.json(summaries);
   } catch (error) {

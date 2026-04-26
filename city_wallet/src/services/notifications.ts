@@ -18,21 +18,13 @@
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import { MAP_MERCHANTS } from "@/src/data/mockData";
 
 /* ─────────────────────────────────────────────────────────────────
    Constants
    ───────────────────────────────────────────────────────────────── */
 
 export const CHANNEL_ID = "city-wallet-coupons";
-
-/** Sample coupons used when triggering demo notifications */
-const DEMO_COUPONS = [
-  { company: "Starbucks",   offer: "Buy 1 Get 1 on any drink",  emoji: "☕" },
-  { company: "McDonald's",  offer: "20% OFF any menu item",     emoji: "🍔" },
-  { company: "H&M",         offer: "15% OFF full-price items",  emoji: "👗" },
-  { company: "IKEA",        offer: "€10 OFF orders over €60",   emoji: "🛋️"  },
-  { company: "City Cinema", offer: "€4 OFF any movie ticket",   emoji: "🎬" },
-];
 
 /* ─────────────────────────────────────────────────────────────────
    Android channel
@@ -131,13 +123,13 @@ export function configureNotificationHandler(): void {
  * "new coupon" push.  Safe to call from a button press in the UI.
  */
 export async function sendDemoCouponNotification(): Promise<void> {
-  const coupon = DEMO_COUPONS[Math.floor(Math.random() * DEMO_COUPONS.length)];
+  const merchant = MAP_MERCHANTS[Math.floor(Math.random() * MAP_MERCHANTS.length)];
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: `${coupon.emoji} New offer from ${coupon.company}`,
-      body: coupon.offer,
-      data: { type: "new_coupon", company: coupon.company },
+      title: `New offer candidate from ${merchant.name}`,
+      body: `${merchant.offer} available once generation is enabled.`,
+      data: { type: "new_coupon", company: merchant.name },
       // Android-specific overrides
       ...(Platform.OS === "android" && {
         color: "#2d6a4f",
