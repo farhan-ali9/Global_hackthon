@@ -21,6 +21,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/package*.json ./
+COPY public ./public
 COPY scripts ./scripts
 
 EXPOSE 8080
