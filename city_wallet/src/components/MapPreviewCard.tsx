@@ -5,7 +5,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 
 import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
-import { MAP_MERCHANTS, USER_LOCATION } from "@/src/data/mockData";
+import { USER_LOCATION } from "@/src/data/mockData";
+import { getDisplayMapMerchants } from "@/src/lib/mapMerchants";
 import { CW, fontFamily } from "@/src/theme/tokens";
 
 /**
@@ -14,7 +15,8 @@ import { CW, fontFamily } from "@/src/theme/tokens";
  */
 export function MapPreviewCard() {
   const router = useRouter();
-  const { context } = useUserContextLoop();
+  const { context, merchants } = useUserContextLoop();
+  const mapMerchants = getDisplayMapMerchants(merchants);
   const userCoordinates = context?.coordinates ?? USER_LOCATION;
   const previewRegion = {
     latitude: userCoordinates.latitude,
@@ -62,7 +64,7 @@ export function MapPreviewCard() {
           </Marker>
 
           {/* Merchant pins */}
-          {MAP_MERCHANTS.map((m) => (
+          {mapMerchants.map((m) => (
             <Marker
               key={m.id}
               coordinate={{ latitude: m.latitude, longitude: m.longitude }}
@@ -94,7 +96,7 @@ export function MapPreviewCard() {
           <Text style={styles.headerTitle}>Nearby Merchants</Text>
         </View>
         <View style={styles.countBadge}>
-          <Text style={styles.countText}>{MAP_MERCHANTS.length} offers</Text>
+          <Text style={styles.countText}>{mapMerchants.length} merchants</Text>
         </View>
       </View>
 

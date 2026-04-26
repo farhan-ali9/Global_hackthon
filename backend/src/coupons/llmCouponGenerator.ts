@@ -15,6 +15,7 @@ export type LlmCouponGeneratorConfig = {
 
 const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 const COUPON_TTL_MS = 15 * 60 * 1000;
+const LOG_PREFIX = "[coupon-generator]";
 
 const SYSTEM_PROMPT = `You generate a single local coupon as JSON.
 
@@ -51,22 +52,45 @@ export function createLlmCouponGenerator(
   return {
     async generate({ merchantId, context, userIntent }) {
       if (!config.apiKey) {
+        console.error(`${LOG_PREFIX} missing OPENROUTER_API_KEY`, {
+          merchantId,
+          model: config.model,
+        });
         throw httpError(
           503,
           "Coupon generation is not configured: OPENROUTER_API_KEY is missing",
         );
       }
 
+      console.info(`${LOG_PREFIX} starting coupon generation`, {
+        merchantId,
+        model: config.model,
+        userIntent,
+        contextKeys: Object.keys(context),
+      });
+
       const merchant = await prisma.merchant.findUnique({
         where: { id: merchantId },
       });
 
       if (!merchant) {
+        console.warn(`${LOG_PREFIX} merchant not found`, { merchantId });
         throw httpError(404, `Merchant ${merchantId} not found`);
       }
       const { description, rules, latitude, longitude } = merchant;
       if (description === null || rules === null || latitude === null || longitude === null) {
-        throw httpError(500, `Merchant ${merchantId} is missing required configuration`);
+        console.error(`${LOG_PREFIX} merchant missing required configuration`, {
+          merchantId,
+          hasDescription: description !== null,
+          hasRules: rules !== null,
+          hasLatitude: latitude !== null,
+          hasLongitude: longitude !== null,
+        });
+        throw httpError(
+          500,
+          `Merchant ${merchantId} is missing required coupon configuration`,
+          { expose: true },
+        );
       }
       const configuredMerchant = {
         id: merchant.id,
@@ -81,10 +105,9 @@ export function createLlmCouponGenerator(
         baseUrl,
         apiKey: config.apiKey,
         model: config.model,
-        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${
-          merchantRules ?? configuredMerchant.rules
-        }`,
+        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${configuredMerchant.rules}`,
         user: buildUserMessage(configuredMerchant, context, userIntent),
+        merchantId,
       });
 
       const generatedCoupon = {
@@ -124,6 +147,12 @@ export function createLlmCouponGenerator(
         },
       });
 
+      console.info(`${LOG_PREFIX} coupon generated`, {
+        merchantId,
+        savingType: generatedCoupon.saving.type,
+        discountPercent: generatedCoupon.discountPercent ?? null,
+      });
+
       return generatedCoupon;
     },
   };
@@ -160,9 +189,16 @@ type OpenRouterArgs = {
   model: string;
   system: string;
   user: string;
+  merchantId: string;
 };
 
 async function callOpenRouter(args: OpenRouterArgs): Promise<LlmCouponPayload> {
+  console.info(`${LOG_PREFIX} calling OpenRouter`, {
+    merchantId: args.merchantId,
+    model: args.model,
+    baseUrl: args.baseUrl,
+  });
+
   const response = await fetch(`${args.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -181,38 +217,124 @@ async function callOpenRouter(args: OpenRouterArgs): Promise<LlmCouponPayload> {
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
+    console.error(`${LOG_PREFIX} OpenRouter request failed`, {
+      merchantId: args.merchantId,
+      model: args.model,
+      status: response.status,
+      detail: truncate(detail, 1_000),
+    });
     throw httpError(
       502,
       `OpenRouter request failed (${response.status}): ${detail.slice(0, 300)}`,
     );
   }
 
-  const json = (await response.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const content = json.choices?.[0]?.message?.content;
+  let json: unknown;
+  try {
+    json = await response.json();
+  } catch (error) {
+    console.error(`${LOG_PREFIX} OpenRouter returned invalid response JSON`, {
+      merchantId: args.merchantId,
+      model: args.model,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw httpError(502, "OpenRouter returned invalid response JSON");
+  }
+
+  const content = extractMessageContent(json);
   if (!content) {
-    throw httpError(502, "OpenRouter response missing message content");
+    console.error(`${LOG_PREFIX} OpenRouter response missing content`, {
+      merchantId: args.merchantId,
+      model: args.model,
+      responsePreview: truncate(stringifyForLog(json), 2_000),
+    });
+    throw httpError(
+      502,
+      "OpenRouter response missing message content; check backend logs for upstream response details",
+    );
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
-  } catch {
+  } catch (error) {
+    console.error(`${LOG_PREFIX} OpenRouter returned invalid JSON`, {
+      merchantId: args.merchantId,
+      model: args.model,
+      contentPreview: truncate(content, 1_000),
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw httpError(502, "OpenRouter returned invalid JSON");
   }
 
   const result = llmCouponPayloadSchema.safeParse(parsed);
   if (!result.success) {
-    throw httpError(502, "OpenRouter response did not match coupon schema");
+    console.error(`${LOG_PREFIX} OpenRouter response schema mismatch`, {
+      merchantId: args.merchantId,
+      model: args.model,
+      issues: result.error.issues,
+      payload: parsed,
+    });
+    throw httpError(
+      502,
+      `OpenRouter response did not match coupon schema: ${result.error.issues
+        .map((issue) => issue.message)
+        .join("; ")}`,
+    );
   }
   return result.data;
 }
 
-function httpError(statusCode: number, message: string) {
-  return Object.assign(new Error(message), { statusCode });
+function httpError(
+  statusCode: number,
+  message: string,
+  options: { expose?: boolean } = {},
+) {
+  return Object.assign(new Error(message), {
+    expose: options.expose ?? statusCode < 500,
+    statusCode,
+  });
 }
 
 function toJsonObject(value: Record<string, unknown>) {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonObject;
+}
+
+function truncate(value: string, maxLength: number) {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function extractMessageContent(value: unknown) {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("choices" in value) ||
+    !Array.isArray(value.choices)
+  ) {
+    return null;
+  }
+
+  const [choice] = value.choices;
+  if (
+    typeof choice !== "object" ||
+    choice === null ||
+    !("message" in choice) ||
+    typeof choice.message !== "object" ||
+    choice.message === null ||
+    !("content" in choice.message)
+  ) {
+    return null;
+  }
+
+  return typeof choice.message.content === "string"
+    ? choice.message.content
+    : null;
+}
+
+function stringifyForLog(value: unknown) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }

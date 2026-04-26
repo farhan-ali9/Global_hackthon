@@ -140,6 +140,8 @@ export type AnonymizedContextPayload = UserContext;
 
 export type MerchantSummary = {
   id: string;
+  name?: string;
+  category?: string;
   description: string;
   cityId: string;
   coordinates: Coordinates;

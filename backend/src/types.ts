@@ -2,6 +2,8 @@ import type { CouponSaving } from "./schemas";
 
 export type MerchantSummary = {
   id: string;
+  name: string;
+  category: string;
   description: string;
   cityId: string;
   coordinates: {

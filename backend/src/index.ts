@@ -1,6 +1,7 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import crypto from "node:crypto";
 import path from "node:path";
 import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
@@ -61,6 +62,8 @@ app.get("/merchants", async (request, response, next) => {
       }
       summaries.push({
         id: merchant.id,
+        name: merchant.name || getMerchantName(merchant.description),
+        category: merchant.category.toLowerCase(),
         description: merchant.description,
         cityId: merchant.cityId,
         coordinates: {
@@ -77,12 +80,28 @@ app.get("/merchants", async (request, response, next) => {
 });
 
 app.post("/coupons/generate", async (request, response, next) => {
+  const requestId = crypto.randomUUID();
   try {
     const couponRequest = couponRequestSchema.parse(request.body);
+    console.info("[coupons.generate] request received", {
+      requestId,
+      merchantId: couponRequest.merchantId,
+      userIntent: couponRequest.userIntent,
+      contextKeys: Object.keys(couponRequest.context),
+    });
     const coupon = await couponGenerator.generate(couponRequest);
+    console.info("[coupons.generate] request succeeded", {
+      requestId,
+      merchantId: couponRequest.merchantId,
+      headline: coupon.headline,
+    });
     response.status(201).json(coupon);
   } catch (error) {
-    next(error);
+    console.error("[coupons.generate] request failed", {
+      requestId,
+      error: toErrorLog(error),
+    });
+    next(withRequestId(error, requestId));
   }
 });
 
@@ -109,26 +128,36 @@ app.use(
     _next: express.NextFunction,
   ) => {
     if (error instanceof ZodError) {
+      const requestId = getErrorRequestId(error);
+      console.warn("[api.validation]", {
+        requestId,
+        issues: error.issues,
+      });
       response
         .status(400)
-        .json({ error: "Invalid request", details: error.flatten() });
+        .json({
+          error: "Invalid request",
+          details: error.flatten(),
+          ...(requestId ? { requestId } : {}),
+        });
       return;
     }
 
-    const statusCode =
-      typeof error === "object" &&
-      error !== null &&
-      "statusCode" in error &&
-      typeof error.statusCode === "number"
-        ? error.statusCode
-        : 500;
+    const statusCode = getErrorStatusCode(error);
+    const requestId = getErrorRequestId(error);
+    const message =
+      statusCode === 500 && !isExposedError(error)
+        ? "Internal server error"
+        : getErrorMessage(error);
 
-    console.error(error);
+    console.error("[api.error]", {
+      requestId,
+      statusCode,
+      error: toErrorLog(error),
+    });
     response.status(statusCode).json({
-      error:
-        statusCode === 500
-          ? "Internal server error"
-          : (error as Error).message,
+      error: message,
+      ...(requestId ? { requestId } : {}),
     });
   },
 );
@@ -139,4 +168,59 @@ app.listen(port, () => {
 
 function toJsonObject(value: Record<string, unknown>) {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonObject;
+}
+
+function getMerchantName(description: string) {
+  return description.split(" — ")[0] ?? description;
+}
+
+function withRequestId(error: unknown, requestId: string) {
+  if (error instanceof Error) {
+    return Object.assign(error, { requestId });
+  }
+
+  return Object.assign(new Error(String(error)), { requestId });
+}
+
+function getErrorStatusCode(error: unknown) {
+  return typeof error === "object" &&
+    error !== null &&
+    "statusCode" in error &&
+    typeof error.statusCode === "number"
+    ? error.statusCode
+    : 500;
+}
+
+function getErrorRequestId(error: unknown) {
+  return typeof error === "object" &&
+    error !== null &&
+    "requestId" in error &&
+    typeof error.requestId === "string"
+    ? error.requestId
+    : undefined;
+}
+
+function isExposedError(error: unknown) {
+  return typeof error === "object" &&
+    error !== null &&
+    "expose" in error &&
+    error.expose === true;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error && error.message
+    ? error.message
+    : "Request failed";
+}
+
+function toErrorLog(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return error;
 }
