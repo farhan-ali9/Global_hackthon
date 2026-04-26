@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -34,6 +35,8 @@ const ACCOUNT_SECTIONS = [
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const navigation = useNavigation();
 
   const [notifEnabled, setNotifEnabled]   = useState(false);
   const [tokenText, setTokenText]         = useState<string | null>(null);
@@ -80,6 +83,34 @@ export default function ProfileScreen() {
     await sendDemoCouponNotification();
     setSending(false);
     Alert.alert("Sent!", "A demo coupon notification was delivered.");
+  }
+
+  function handleSignOut() {
+    Alert.alert(
+      "Sign out",
+      "Are you sure you want to sign out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign out",
+          style: "destructive",
+          onPress: async () => {
+            await cancelAllNotifications();
+            // Walk up to the root Stack navigator (parent of the tabs navigator)
+            // and navigate to the "index" screen (app/index.tsx = welcome screen)
+            const rootNav = navigation.getParent();
+            if (rootNav) {
+              rootNav.reset({
+                index: 0,
+                routes: [{ name: "index" as never }],
+              });
+            } else {
+              router.replace("/");
+            }
+          },
+        },
+      ],
+    );
   }
 
   async function handleScheduleDigest() {
@@ -224,6 +255,7 @@ export default function ProfileScreen() {
 
         <Pressable
           style={({ pressed }) => [styles.signOutBtn, pressed && styles.pressed]}
+          onPress={handleSignOut}
         >
           <Ionicons name="log-out-outline" size={16} color="#b94040" />
           <Text style={styles.signOutText}>Sign Out</Text>
