@@ -25,7 +25,7 @@ const corsOrigin = process.env.CORS_ORIGIN ?? "*";
 const couponGenerator = createLlmCouponGenerator(prisma, {
   apiKey: process.env.GROQ_API_KEY ?? "",
   model: process.env.GROQ_MODEL ?? "llama-3.1-8b-instant",
-  baseUrl: "https://api.groq.com/openai/v1",
+  baseUrl: process.env.GROQ_BASE_URL ?? "https://api.groq.com/openai/v1",
 });
 
 app.use(

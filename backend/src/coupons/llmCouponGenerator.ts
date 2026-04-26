@@ -13,7 +13,7 @@ export type LlmCouponGeneratorConfig = {
   baseUrl?: string;
 };
 
-const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
+const DEFAULT_BASE_URL = "https://api.groq.com/openai/v1";
 const COUPON_TTL_MS = 15 * 60 * 1000;
 const LOG_PREFIX = "[coupon-generator]";
 
@@ -183,7 +183,7 @@ function buildUserMessage(
     .join("\n");
 }
 
-type OpenRouterArgs = {
+type GroqApiArgs = {
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -192,7 +192,7 @@ type OpenRouterArgs = {
   merchantId: string;
 };
 
-async function callLlmApi(args: OpenRouterArgs): Promise<LlmCouponPayload> {
+async function callLlmApi(args: GroqApiArgs): Promise<LlmCouponPayload> {
   console.info(`${LOG_PREFIX} calling LLM API`, {
     merchantId: args.merchantId,
     model: args.model,
@@ -217,7 +217,7 @@ async function callLlmApi(args: OpenRouterArgs): Promise<LlmCouponPayload> {
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    console.error(`${LOG_PREFIX} OpenRouter request failed`, {
+    console.error(`${LOG_PREFIX} Groq request failed`, {
       merchantId: args.merchantId,
       model: args.model,
       status: response.status,
@@ -225,7 +225,7 @@ async function callLlmApi(args: OpenRouterArgs): Promise<LlmCouponPayload> {
     });
     throw httpError(
       502,
-      `OpenRouter request failed (${response.status}): ${detail.slice(0, 300)}`,
+      `Groq request failed (${response.status}): ${detail.slice(0, 300)}`,
     );
   }
 
@@ -233,24 +233,24 @@ async function callLlmApi(args: OpenRouterArgs): Promise<LlmCouponPayload> {
   try {
     json = await response.json();
   } catch (error) {
-    console.error(`${LOG_PREFIX} OpenRouter returned invalid response JSON`, {
+    console.error(`${LOG_PREFIX} Groq returned invalid response JSON`, {
       merchantId: args.merchantId,
       model: args.model,
       error: error instanceof Error ? error.message : String(error),
     });
-    throw httpError(502, "OpenRouter returned invalid response JSON");
+    throw httpError(502, "Groq returned invalid response JSON");
   }
 
   const content = extractMessageContent(json);
   if (!content) {
-    console.error(`${LOG_PREFIX} OpenRouter response missing content`, {
+    console.error(`${LOG_PREFIX} Groq response missing content`, {
       merchantId: args.merchantId,
       model: args.model,
       responsePreview: truncate(stringifyForLog(json), 2_000),
     });
     throw httpError(
       502,
-      "OpenRouter response missing message content; check backend logs for upstream response details",
+      "Groq response missing message content; check backend logs for upstream response details",
     );
   }
 
@@ -258,18 +258,18 @@ async function callLlmApi(args: OpenRouterArgs): Promise<LlmCouponPayload> {
   try {
     parsed = JSON.parse(content);
   } catch (error) {
-    console.error(`${LOG_PREFIX} OpenRouter returned invalid JSON`, {
+    console.error(`${LOG_PREFIX} Groq returned invalid JSON`, {
       merchantId: args.merchantId,
       model: args.model,
       contentPreview: truncate(content, 1_000),
       error: error instanceof Error ? error.message : String(error),
     });
-    throw httpError(502, "OpenRouter returned invalid JSON");
+    throw httpError(502, "Groq returned invalid JSON");
   }
 
   const result = llmCouponPayloadSchema.safeParse(parsed);
   if (!result.success) {
-    console.error(`${LOG_PREFIX} OpenRouter response schema mismatch`, {
+    console.error(`${LOG_PREFIX} Groq response schema mismatch`, {
       merchantId: args.merchantId,
       model: args.model,
       issues: result.error.issues,
@@ -277,7 +277,7 @@ async function callLlmApi(args: OpenRouterArgs): Promise<LlmCouponPayload> {
     });
     throw httpError(
       502,
-      `OpenRouter response did not match coupon schema: ${result.error.issues
+      `Groq response did not match coupon schema: ${result.error.issues
         .map((issue) => issue.message)
         .join("; ")}`,
     );
