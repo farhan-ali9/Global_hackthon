@@ -15,4 +15,15 @@ module.exports = ({ config }) => ({
       },
     },
   },
+  plugins: [
+    ...(config.plugins ?? []),
+    [
+      "expo-notifications",
+      {
+        color: "#1a1a1c",
+        androidMode: "default",
+        androidCollapsedTitle: "City Wallet",
+      },
+    ],
+  ],
 });
