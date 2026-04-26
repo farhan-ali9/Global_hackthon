@@ -1,8 +1,8 @@
 # City Wallet App
 
 Expo Go-compatible mobile app for the City Wallet demo. The app collects
-device-side context and ranks nearby merchants locally. Coupon generation is
-currently paused while the pre-generation pipeline is stabilized.
+device-side context, ranks nearby merchants locally, and generates backend
+coupons in an app-wide loop.
 
 ## Running Locally
 
@@ -47,8 +47,8 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
 - `src/context-engine/ReactNativeAiMerchantModelClient.native.ts` - Native
   React Native AI/GGUF merchant-selection model client for custom dev builds.
 - `src/context-engine/UserContextLoopProvider.tsx` - App-wide 10-second loop
-  that refreshes context, fetches merchants, and asks the local model/fallback
-  to choose a merchant.
+  that refreshes context, fetches merchants, asks the local model/fallback
+  to choose a merchant, and requests coupon generation.
 - `src/lib/api.ts` - Backend API client.
 - `src/lib/demoState.ts` - In-memory handoff between demo screens.
 - `src/storage/userProfileStorage.ts` - SQLite-backed local onboarding profile
@@ -69,7 +69,9 @@ every 10 seconds, the provider:
    `LocalMerchantRecommender.ts`. Native builds register the React Native
    AI/GGUF implementation at app startup; web and test builds use the
    deterministic nearest-merchant fallback.
-4. (Temporarily disabled) Coupon generation is intentionally skipped.
+4. Calls `POST /coupons/generate` with `{ merchantId, userIntent, context }`
+   and appends each generated coupon into an in-memory coupon list rendered
+   by `app/(tabs)/coupons.tsx`.
 
 ## How to Work With It
 

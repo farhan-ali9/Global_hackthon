@@ -21,6 +21,7 @@ import { buildCouponRequestContext, deviceContextProvider } from "./ContextProvi
 import { recommendMerchant } from "./LocalMerchantRecommender";
 
 const REFRESH_INTERVAL_MS = 10_000;
+const MAX_COUPON_HISTORY = 50;
 
 type UserContextLoopStatus = "idle" | "refreshing" | "ready" | "error";
 
@@ -30,6 +31,7 @@ type UserContextLoopState = {
   merchants: MerchantSummary[];
   recommendation: LocalRecommendationResponse | null;
   coupon: GeneratedCouponResponse | null;
+  coupons: GeneratedCouponResponse[];
   couponError: string | null;
   lastUpdatedAt: string | null;
   error: string | null;
@@ -45,6 +47,7 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
   const [recommendation, setRecommendation] =
     useState<LocalRecommendationResponse | null>(null);
   const [coupon, setCoupon] = useState<GeneratedCouponResponse | null>(null);
+  const [coupons, setCoupons] = useState<GeneratedCouponResponse[]>([]);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +112,9 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
       setMerchants(nextMerchants);
       setRecommendation(nextRecommendation);
       setCoupon(nextCoupon);
+      if (nextCoupon) {
+        setCoupons((previousCoupons) => [nextCoupon, ...previousCoupons].slice(0, MAX_COUPON_HISTORY));
+      }
       setCouponError(nextCouponError);
       setLastUpdatedAt(new Date().toISOString());
       setStatus("ready");
@@ -147,6 +153,7 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
       merchants,
       recommendation,
       coupon,
+      coupons,
       couponError,
       lastUpdatedAt,
       error,
@@ -158,6 +165,7 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
       merchants,
       recommendation,
       coupon,
+      coupons,
       couponError,
       lastUpdatedAt,
       error,

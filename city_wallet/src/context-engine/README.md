@@ -13,9 +13,10 @@ selection for City Wallet.
    pick a merchant plus generate `userIntent` in a separate local-model prompt,
    then requests a coupon from the backend with
    `{ merchantId, userIntent, context }`.
-3. The generated coupon is stored in in-memory React state in the loop provider
-   (RAM only, no persistence/database write), and `app/(tabs)/coupons.tsx`
-   renders it.
+3. Each generated coupon is pushed into an in-memory coupon history in the loop
+   provider (RAM only, no persistence/database write). The latest coupon is also
+   exposed directly, and `app/(tabs)/coupons.tsx` renders the running coupon
+   feed from that generated list.
 4. `LocalMerchantRecommender.ts` is the adapter boundary for local merchant
    ranking. Native builds register `ReactNativeAiMerchantModelClient.native.ts`,
    which downloads the configured GGUF model on first use and runs it through

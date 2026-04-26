@@ -23,6 +23,12 @@
 - Kept coupon generation inside the 10-second context loop and stored the
   generated coupon only in frontend in-memory state (RAM) for rendering on the
   Coupons tab, with no coupon persistence in any database.
+- Updated the frontend loop to append every newly generated coupon into a
+  rolling in-memory history and render that running feed in the Coupons tab so
+  users immediately see each new coupon as it is generated.
+- Removed the mock merchant-pipeline coupon rendering from the Coupons tab and
+  now show only the generated coupon list coming from the 10-second context
+  loop.
 - Wired the Profile tab to read display name, city, avatar color, and member
   since year from SQLite-backed profile storage instead of hardcoded defaults.
 - Removed OpenRouter from coupon generation and switched backend coupon
