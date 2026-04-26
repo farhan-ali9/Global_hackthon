@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 
 import { llmCouponPayloadSchema, type LlmCouponPayload } from "../schemas";
 import type { CouponRequest, GeneratedCouponResponse } from "../types";
@@ -68,24 +68,34 @@ export function createLlmCouponGenerator(
       if (description === null || rules === null || latitude === null || longitude === null) {
         throw httpError(500, `Merchant ${merchantId} is missing required configuration`);
       }
+      const configuredMerchant = {
+        id: merchant.id,
+        description,
+        cityId: merchant.cityId,
+        latitude,
+        longitude,
+        rules,
+      };
 
       const payload = await callOpenRouter({
         baseUrl,
         apiKey: config.apiKey,
         model: config.model,
-        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${merchant.rules}`,
-        user: buildUserMessage(merchant, context, userIntent),
+        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${
+          merchantRules ?? configuredMerchant.rules
+        }`,
+        user: buildUserMessage(configuredMerchant, context, userIntent),
       });
 
-      return {
+      const generatedCoupon = {
         merchantId: merchant.id,
         merchant: {
           id: merchant.id,
-          description: merchant.description,
+          description: configuredMerchant.description,
           cityId: merchant.cityId,
           coordinates: {
-            latitude: merchant.latitude,
-            longitude: merchant.longitude,
+            latitude: configuredMerchant.latitude,
+            longitude: configuredMerchant.longitude,
           },
         },
         headline: payload.headline,
@@ -100,6 +110,21 @@ export function createLlmCouponGenerator(
         expiresAt: new Date(Date.now() + COUPON_TTL_MS).toISOString(),
         userIntent,
       };
+
+      await prisma.merchantAnalyticsEvent.create({
+        data: {
+          merchantId: merchant.id,
+          type: "COUPON_GENERATED",
+          metadata: toJsonObject({
+            userIntent: userIntent ?? null,
+            discountPercent: generatedCoupon.discountPercent ?? null,
+            saving: generatedCoupon.saving,
+            context,
+          }),
+        },
+      });
+
+      return generatedCoupon;
     },
   };
 }
@@ -186,4 +211,8 @@ async function callOpenRouter(args: OpenRouterArgs): Promise<LlmCouponPayload> {
 
 function httpError(statusCode: number, message: string) {
   return Object.assign(new Error(message), { statusCode });
+}
+
+function toJsonObject(value: Record<string, unknown>) {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonObject;
 }

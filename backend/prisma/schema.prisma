@@ -8,12 +8,174 @@ datasource db {
 }
 
 model Merchant {
-  id          String @id
-  description String
-  cityId      String
-  latitude    Float
-  longitude   Float
-  rules       String
+  id             String           @id
+  name           String           @default("")
+  category       MerchantCategory @default(CAFE)
+  cityId         String
+  zoneId         String           @default("")
+  distanceMeters Int              @default(0)
+  active         Boolean          @default(true)
+  status         MerchantStatus   @default(ACTIVE)
+  ownerId        String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  description    String?
+  latitude       Float?
+  longitude      Float?
+  rules          String?
+
+  owner           MerchantOwner?           @relation(fields: [ownerId], references: [id])
+  ruleSet         CouponRuleSet?
+  analyticsEvents MerchantAnalyticsEvent[]
+  DemandSignal    DemandSignal[]
+  MerchantRule    MerchantRule?
+  Offer           Offer[]
+  Redemption      Redemption[]
 
   @@index([cityId])
+  @@index([ownerId])
+}
+
+model DemandSignal {
+  id         String      @id
+  merchantId String
+  state      DemandState
+  score      Int
+  observedAt DateTime    @default(now())
+  Merchant   Merchant    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId, observedAt])
+}
+
+model MerchantRule {
+  id                 String   @id
+  merchantId         String   @unique
+  goal               String
+  maxDiscountPercent Int
+  quietHours         String
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime
+  Merchant           Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+}
+
+model Offer {
+  id                String      @id
+  merchantId        String
+  anonymizedContext Json
+  uiSpec            Json
+  discountPercent   Int
+  status            OfferStatus @default(GENERATED)
+  expiresAt         DateTime
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime
+  Merchant          Merchant    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  Redemption        Redemption?
+}
+
+model Redemption {
+  id         String           @id
+  offerId    String           @unique
+  merchantId String
+  token      String           @unique
+  status     RedemptionStatus @default(PENDING)
+  expiresAt  DateTime
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime
+  Merchant   Merchant         @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  Offer      Offer            @relation(fields: [offerId], references: [id], onDelete: Cascade)
+}
+
+model MerchantOwner {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  merchants Merchant[]
+  sessions  MerchantSession[]
+}
+
+model MerchantSession {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  ownerId   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  owner MerchantOwner @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([expiresAt])
+}
+
+model CouponRuleSet {
+  id                 String   @id @default(cuid())
+  merchantId         String   @unique
+  maxDiscountPercent Int      @default(15)
+  allowedWindows     Json
+  exclusions         Json
+  tone               String   @default("friendly and concise")
+  validityMinutes    Int      @default(15)
+  extraInstructions  String   @default("")
+  rulesMarkdown      String
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+}
+
+model MerchantAnalyticsEvent {
+  id         String             @id @default(cuid())
+  merchantId String
+  type       AnalyticsEventType
+  metadata   Json?
+  createdAt  DateTime           @default(now())
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId, type])
+  @@index([createdAt])
+}
+
+enum MerchantStatus {
+  ACTIVE
+  DRAFT
+  SUSPENDED
+}
+
+enum DemandState {
+  QUIET
+  NORMAL
+  BUSY
+}
+
+enum MerchantCategory {
+  CAFE
+  RESTAURANT
+  RETAIL
+  CULTURE
+}
+
+enum OfferStatus {
+  GENERATED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REDEEMED
+}
+
+enum RedemptionStatus {
+  PENDING
+  REDEEMED
+  EXPIRED
+}
+
+enum AnalyticsEventType {
+  RECOMMENDED
+  COUPON_GENERATED
+  COUPON_ACCEPTED
+  COUPON_REDEEMED
 }
