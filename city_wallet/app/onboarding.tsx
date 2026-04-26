@@ -105,7 +105,7 @@ const QUESTIONS: Question[] = [
     icon: "bus-outline",
     title: "How do you get around?",
     subtitle: "We'll highlight transit offers for your style",
-    multi: false,
+    multi: true,
     options: [
       { id: "walk",    label: "Walking",        icon: "walk-outline" },
       { id: "bike",    label: "Cycling",        icon: "bicycle-outline" },
