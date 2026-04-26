@@ -91,6 +91,31 @@ export const deviceContextProvider: ContextProvider = {
 
 export const mockContextProvider = deviceContextProvider;
 
+export function buildCouponRequestContext(context: UserContext): Record<string, unknown> {
+  return {
+    cityId: context.cityId,
+    zoneId: context.zoneId,
+    currentTimeIso: context.currentTimeIso,
+    timezone: context.timezone,
+    locale: context.locale,
+    dayOfWeek: context.dayOfWeek,
+    isWeekend: context.isWeekend,
+    timeOfDay: context.timeOfDay,
+    weatherBucket: context.weatherBucket,
+    weatherLabel: context.weather.label,
+    intentLabels: context.intentLabels,
+    demandTags: context.demandTags,
+    eventTags: context.eventTags,
+    mobilityState: context.mobilityState,
+    privacyLevel: "coarse_no_raw_coordinates",
+    profileSignals:
+      context.profile?.onboardingAnswers.map((answer) => ({
+        questionId: answer.questionId,
+        selectedOptionIds: answer.selectedOptions.map((option) => option.id),
+      })) ?? [],
+  };
+}
+
 async function getWeatherWithFallback(coordinates: Coordinates): Promise<WeatherSituation> {
   try {
     const weatherResponse = await getWeatherFromGps(

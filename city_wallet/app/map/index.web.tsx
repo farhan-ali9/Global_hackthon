@@ -7,7 +7,9 @@ import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { MAP_MERCHANTS, USER_LOCATION } from "@/src/data/mockData";
+import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
+import { USER_LOCATION } from "@/src/data/mockData";
+import { getDisplayMapMerchants } from "@/src/lib/mapMerchants";
 import { CW, fontFamily } from "@/src/theme/tokens";
 
 const { latitude: lat, longitude: lon } = USER_LOCATION;
@@ -22,6 +24,8 @@ const EMBED_SRC =
 export default function FullMapScreenWeb() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { merchants } = useUserContextLoop();
+  const mapMerchants = getDisplayMapMerchants(merchants);
 
   return (
     <View style={styles.root}>
@@ -36,7 +40,7 @@ export default function FullMapScreenWeb() {
 
         <View style={styles.titleBox}>
           <Text style={styles.title}>Nearby Merchants</Text>
-          <Text style={styles.subtitle}>{MAP_MERCHANTS.length} offers available</Text>
+          <Text style={styles.subtitle}>{mapMerchants.length} merchants nearby</Text>
         </View>
 
         {/* spacer to balance layout */}

@@ -81,6 +81,38 @@ export function buildLocalModelPrompt(request: LocalRecommendationRequest) {
   return `${prompt.slice(0, MAX_PROMPT_CHARS)}\n\n[Prompt truncated to fit local model context window]`;
 }
 
+export function buildLocalIntentPrompt(
+  request: LocalRecommendationRequest,
+  recommendation: Pick<LocalRecommendationResponse, "merchantId" | "reasoningTags">,
+) {
+  const compactContext = buildCompactContext(request);
+  const recommendedMerchant = request.merchants.find(
+    (merchant) => merchant.id === recommendation.merchantId,
+  );
+  const prompt = [
+    "Infer the user's immediate shopping intent from this private on-device context.",
+    "The merchant was selected in a separate step and is included as a hint only.",
+    'Return JSON only with this shape: {"userIntent":"..."}',
+    "userIntent must be a short snake_case phrase (2-6 words). No markdown or extra text.",
+    "",
+    "User context:",
+    JSON.stringify(compactContext),
+    "",
+    "Recommended merchant:",
+    JSON.stringify({
+      merchantId: recommendation.merchantId,
+      description: recommendedMerchant?.description.slice(0, MAX_DESCRIPTION_CHARS) ?? "",
+      reasoningTags: recommendation.reasoningTags ?? [],
+    }),
+  ].join("\n");
+
+  if (prompt.length <= MAX_PROMPT_CHARS) {
+    return prompt;
+  }
+
+  return `${prompt.slice(0, MAX_PROMPT_CHARS)}\n\n[Prompt truncated to fit local model context window]`;
+}
+
 export function buildLocalRankingSignals(
   request: LocalRecommendationRequest,
 ): LocalRankingSignal[] {
@@ -102,6 +134,7 @@ function getFallbackRecommendation(
 
   return {
     merchantId: rankedMerchantIds[0],
+    userIntent: buildFallbackUserIntent(request),
     confidence: 0.35,
     reasoningTags,
     rankedMerchantIds,
@@ -119,6 +152,7 @@ function validateRecommendation(
 
   return {
     ...recommendation,
+    userIntent: sanitizeModelUserIntent(recommendation.userIntent, request),
     rankedMerchantIds: normalizeRankedMerchantIds(request, recommendation),
   };
 }
@@ -244,4 +278,18 @@ function buildCompactMerchants(
 function roundTo(value: number, decimals: number) {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
+}
+
+function sanitizeModelUserIntent(intent: string | undefined, request: LocalRecommendationRequest) {
+  const trimmed = intent?.trim().toLowerCase();
+  if (trimmed) {
+    return trimmed;
+  }
+  return buildFallbackUserIntent(request);
+}
+
+function buildFallbackUserIntent(request: LocalRecommendationRequest) {
+  const firstIntent = request.context.intentLabels[0] ?? "browsing";
+  const firstDemand = request.context.demandTags[0] ?? "local_discovery";
+  return `${firstIntent}_${firstDemand}`.replaceAll("-", "_");
 }

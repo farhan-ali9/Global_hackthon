@@ -133,11 +133,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
-    const message = await response.text();
+    const errorBody = await readErrorBody(response);
+    console.log("[api] request failed", {
+      method,
+      requestUrl,
+      status: response.status,
+      errorBody,
+    });
     throw new Error(
-      `Request failed (${response.status}) for ${method} ${requestUrl}${
-        message ? `: ${message}` : ""
-      }`,
+      buildHttpFailureMessage({ method, requestUrl, response, errorBody }),
     );
   }
 
@@ -160,4 +164,47 @@ function buildNetworkFailureMessage(args: {
       : "";
 
   return `Network request failed for ${args.method} ${args.requestUrl}.${localhostHint}${detail}`;
+}
+
+async function readErrorBody(response: Response) {
+  const text = await response.text();
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+function buildHttpFailureMessage(args: {
+  method: string;
+  requestUrl: string;
+  response: Response;
+  errorBody: unknown;
+}) {
+  const serverError =
+    typeof args.errorBody === "object" &&
+    args.errorBody !== null &&
+    "error" in args.errorBody &&
+    typeof args.errorBody.error === "string"
+      ? args.errorBody.error
+      : null;
+  const requestId =
+    typeof args.errorBody === "object" &&
+    args.errorBody !== null &&
+    "requestId" in args.errorBody &&
+    typeof args.errorBody.requestId === "string"
+      ? args.errorBody.requestId
+      : null;
+  const rawDetail =
+    serverError === null && typeof args.errorBody === "string"
+      ? args.errorBody
+      : null;
+  const detail = serverError ?? rawDetail;
+  const requestIdDetail = requestId ? ` Request ID: ${requestId}.` : "";
+
+  return `${args.method} ${args.requestUrl} failed with ${args.response.status}${
+    detail ? `: ${detail}` : ""
+  }.${requestIdDetail}`;
 }

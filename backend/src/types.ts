@@ -2,6 +2,8 @@ import type { CouponSaving } from "./schemas";
 
 export type MerchantSummary = {
   id: string;
+  name: string;
+  category: string;
   description: string;
   cityId: string;
   coordinates: {
@@ -13,8 +15,7 @@ export type MerchantSummary = {
 export type CouponRequest = {
   merchantId: string;
   context: Record<string, unknown>;
-  userIntent?: string;
-  merchantRules?: string;
+  userIntent: string;
 };
 
 export type CouponMerchant = {

@@ -14,6 +14,15 @@
   labels, and demand tags.
 - Added frontend API calls for `GET /merchants?cityId=...` and
   `POST /coupons/generate`.
+- Wired the local-model recommendation loop to call `POST /coupons/generate`
+  with selected `merchantId` plus derived `userIntent`, aligned mobile coupon
+  types with backend `saving` payload, and surfaced generated coupon details in
+  Home and Coupons tabs.
+- Split local-model inference into two prompts: one for merchant selection and
+  one for `userIntent` generation, then sent both outputs to coupon generation.
+- Kept coupon generation inside the 10-second context loop and stored the
+  generated coupon only in frontend in-memory state (RAM) for rendering on the
+  Coupons tab, with no coupon persistence in any database.
 - Added a local merchant recommender adapter for React Native AI/GGUF model
   integration and wired the app root to select a merchant locally before coupon
   generation.
