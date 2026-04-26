@@ -98,6 +98,22 @@ export type WeatherSituation = {
   source: "placeholder" | "device" | "weather_api";
 };
 
+export type OnboardingAnswer = {
+  questionId: string;
+  questionTitle: string;
+  selectedOptions: {
+    id: string;
+    label: string;
+  }[];
+};
+
+export type UserProfile = {
+  id: string;
+  onboardingAnswers: OnboardingAnswer[];
+  completedAtIso: string;
+  updatedAtIso: string;
+};
+
 export type UserContext = {
   cityId: string;
   zoneId: string;
@@ -115,6 +131,7 @@ export type UserContext = {
   eventTags: string[];
   demandTags: string[];
   mobilityState: "stationary" | "walking" | "commuting" | "unknown";
+  profile: UserProfile | null;
   privacyLevel: "device_precise";
 };
 

@@ -3,6 +3,8 @@
 ## 2026-04-26
 
 ### Frontend app-wide context coupon loop
+- Added SQLite-backed onboarding profile persistence on the client and included
+  the stored profile in the local merchant-selection context.
 - Added a City Wallet context engine that refreshes user context every 10
   seconds with coordinates, current time, timezone, weather placeholder, intent
   labels, and demand tags.

@@ -40,7 +40,7 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
 - `app/offers/[id].tsx` - Plain offer detail and accept action.
 - `app/redeem/[id].tsx` - Plain redemption token/status screen.
 - `src/context-engine/ContextProvider.ts` - Device context provider for
-  location, time, weather placeholder, and derived intent signals.
+  location, time, weather, stored onboarding profile, and derived intent signals.
 - `src/context-engine/LocalMerchantRecommender.ts` - Adapter boundary for the
   React Native AI/GGUF merchant-selection model.
 - `src/context-engine/UserContextLoopProvider.tsx` - App-wide 10-second loop
@@ -48,6 +48,8 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
   merchant, and requests backend coupon generation.
 - `src/lib/api.ts` - Backend API client.
 - `src/lib/demoState.ts` - In-memory handoff between demo screens.
+- `src/storage/userProfileStorage.ts` - SQLite-backed local onboarding profile
+  storage.
 - `src/types/city-wallet.ts` - API contracts shared by the mobile app.
 
 ## Context Coupon Loop
@@ -56,13 +58,14 @@ The root layout wraps the app in `UserContextLoopProvider`. On mount, and then
 every 10 seconds, the provider:
 
 1. Builds a `UserContext` with precise coordinates, local time, timezone,
-   coordinate-derived city/zone ids, weather bucket/details, intent labels, and
-   demand tags.
+   coordinate-derived city/zone ids, weather bucket/details, stored onboarding
+   profile answers, intent labels, and demand tags.
 2. Calls `GET /merchants?cityId=<id>` to retrieve merchant candidates for the
    user's broad city.
 3. Calls `recommendMerchant({ context, merchants })` in
    `LocalMerchantRecommender.ts`. Register the React Native AI/GGUF
-   implementation with `setLocalMerchantModelClient(...)`.
+   implementation with `setLocalMerchantModelClient(...)`. The local model
+   receives the stored onboarding profile as part of the context payload.
 4. Calls `POST /coupons/generate` with the selected `merchantId` and a reduced
    context payload. Precise coordinates stay on device for local ranking.
 

@@ -1,9 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
-import { useRouter, type Href } from "expo-router";
-
-type IoniconsName = ComponentProps<typeof Ionicons>["name"];
 import { useRef, useState } from "react";
+import { useRouter, type Href } from "expo-router";
 import {
   Animated,
   Pressable,
@@ -14,7 +12,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { saveUserProfile } from "@/src/storage/userProfileStorage";
 import { CW, fontFamily } from "@/src/theme/tokens";
+
+type IoniconsName = ComponentProps<typeof Ionicons>["name"];
 
 /* ─────────────────────────────────────────────────────────────────
    Question definitions
@@ -130,6 +131,7 @@ export default function OnboardingQuestionnaire() {
 
   const [step, setStep]       = useState(0);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   // Animated progress bar width (0→1)
   const progressAnim = useRef(new Animated.Value(1 / QUESTIONS.length)).current;
@@ -177,12 +179,29 @@ export default function OnboardingQuestionnaire() {
     setAnswers({ ...answers, [q.id]: next });
   }
 
-  function handleNext() {
+  async function handleNext() {
     if (!canNext) return;
     if (isLast) {
-      // Save answers and go to home
-      // In a real app: persist answers to storage/backend here
-      router.replace("/(tabs)" as Href);
+      setIsSaving(true);
+      try {
+        await saveUserProfile(
+          QUESTIONS.map((question) => ({
+            questionId: question.id,
+            questionTitle: question.title,
+            selectedOptions: (answers[question.id] ?? []).map((optionId) => {
+              const option = question.options.find((candidate) => candidate.id === optionId);
+
+              return {
+                id: optionId,
+                label: option?.label ?? optionId,
+              };
+            }),
+          })),
+        );
+        router.replace("/(tabs)" as Href);
+      } finally {
+        setIsSaving(false);
+      }
     } else {
       animateToStep(step + 1, 1);
     }
@@ -302,14 +321,14 @@ export default function OnboardingQuestionnaire() {
         <Pressable
           style={({ pressed }) => [
             styles.nextBtn,
-            !canNext && styles.nextBtnDisabled,
-            pressed && canNext && styles.nextBtnPressed,
+            (!canNext || isSaving) && styles.nextBtnDisabled,
+            pressed && canNext && !isSaving && styles.nextBtnPressed,
           ]}
           onPress={handleNext}
-          disabled={!canNext}
+          disabled={!canNext || isSaving}
         >
           <Text style={styles.nextBtnText}>
-            {isLast ? "Get started →" : "Continue →"}
+            {isSaving ? "Saving..." : isLast ? "Get started →" : "Continue →"}
           </Text>
         </Pressable>
       </View>
