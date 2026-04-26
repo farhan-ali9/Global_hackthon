@@ -51,6 +51,8 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
   merchant, and requests backend coupon generation.
 - `src/lib/api.ts` - Backend API client.
 - `src/lib/demoState.ts` - In-memory handoff between demo screens.
+- `src/storage/userProfileStorage.ts` - SQLite-backed local onboarding profile
+  storage.
 - `src/types/city-wallet.ts` - API contracts shared by the mobile app.
 
 ## Context Coupon Loop
@@ -59,8 +61,8 @@ The root layout wraps the app in `UserContextLoopProvider`. On mount, and then
 every 10 seconds, the provider:
 
 1. Builds a `UserContext` with precise coordinates, local time, timezone,
-   coordinate-derived city/zone ids, weather bucket/details, intent labels, and
-   demand tags.
+   coordinate-derived city/zone ids, weather bucket/details, stored onboarding
+   profile answers, intent labels, and demand tags.
 2. Calls `GET /merchants?cityId=<id>` to retrieve merchant candidates for the
    user's broad city.
 3. Calls `recommendMerchant({ context, merchants })` in

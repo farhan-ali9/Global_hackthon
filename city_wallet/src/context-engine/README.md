@@ -6,8 +6,8 @@ selection for City Wallet.
 ## Flow
 
 1. `ContextProvider.ts` builds a `UserContext` from device location, current
-   time, timezone, coordinate-derived city/zone ids, placeholder weather, and
-   derived intent/demand signals.
+   time, timezone, coordinate-derived city/zone ids, weather, the locally stored
+   onboarding profile, and derived intent/demand signals.
 2. `UserContextLoopProvider.tsx` refreshes that context every 10 seconds,
    fetches merchants for the user's `cityId`, asks the local recommender to pick
    a merchant, and requests a coupon from the backend.
@@ -16,8 +16,9 @@ selection for City Wallet.
    which downloads the configured GGUF model on first use and runs it through
    React Native AI/llama.rn. Web and test builds keep the deterministic fallback.
 
-Precise coordinates are only used on device. The backend coupon request receives
-a reduced context payload without raw GPS coordinates.
+Precise coordinates and the onboarding profile are used for local merchant
+selection. The backend coupon request receives a reduced context payload without
+raw GPS coordinates.
 
 `cityId` is resolved from configured coordinate bounds. At the moment, the only
 backend-seeded city is `linz-demo`, so coordinates outside configured bounds

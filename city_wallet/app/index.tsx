@@ -87,7 +87,7 @@ export default function Onboarding() {
             />
             <Pressable
               style={({ pressed }) => [styles.getStartedBtn, pressed && styles.pressed]}
-              onPress={() => router.replace("/(tabs)" as Href)}
+              onPress={() => router.push("/onboarding" as Href)}
             >
               <Text style={styles.getStartedText}>Get Started</Text>
             </Pressable>
@@ -117,7 +117,7 @@ export default function Onboarding() {
             style={({ pressed }) => [styles.ghostBtn, pressed && styles.pressed]}
             onPress={() => router.replace("/(tabs)" as Href)}
           >
-            <Text style={styles.ghostBtnText}>Sign in with existing account</Text>
+            <Text style={styles.ghostBtnText}>Already have an account? Sign in</Text>
           </Pressable>
         </View>
       </ScrollView>

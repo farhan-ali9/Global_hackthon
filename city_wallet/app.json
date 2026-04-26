@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "city_wallet",
+    "name": "City Wallet",
     "slug": "city_wallet",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,6 +13,7 @@
       "bundleIdentifier": "com.dklingbeil.city-wallet"
     },
     "android": {
+      "package": "com.citywallet.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -44,6 +45,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2de74adc-7764-4b83-b834-de34bde5f067"
+      }
     }
   }
 }
