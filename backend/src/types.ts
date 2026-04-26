@@ -13,8 +13,7 @@ export type MerchantSummary = {
 export type CouponRequest = {
   merchantId: string;
   context: Record<string, unknown>;
-  userIntent?: string;
-  merchantRules?: string;
+  userIntent: string;
 };
 
 export type CouponMerchant = {

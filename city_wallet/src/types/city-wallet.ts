@@ -152,6 +152,7 @@ export type LocalRecommendationRequest = {
 
 export type LocalRecommendationResponse = {
   merchantId: string;
+  userIntent: string;
   confidence?: number;
   reasoningTags?: string[];
   rankedMerchantIds?: string[];
@@ -162,16 +163,40 @@ export type LocalRecommendationResponse = {
 export type GenerateCouponRequest = {
   merchantId: string;
   context: Record<string, unknown>;
+  userIntent: string;
+};
+
+export type CouponSaving =
+  | {
+      type: "percentage";
+      value: number;
+      displayText: string;
+    }
+  | {
+      type: "amount";
+      amount: number;
+      currency: string;
+      displayText: string;
+    };
+
+export type CouponMerchant = {
+  id: string;
+  description: string;
+  cityId: string;
+  coordinates: Coordinates;
 };
 
 export type GeneratedCouponResponse = {
   merchantId: string;
+  merchant: CouponMerchant;
   headline: string;
   body: string;
-  discountPercent: number;
+  saving: CouponSaving;
+  discountPercent?: number;
   ctaLabel: string;
   expiresAt: string;
   explanationTags: string[];
+  userIntent?: string;
 };
 
 export type OfferUiSpec = {

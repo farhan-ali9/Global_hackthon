@@ -7,8 +7,7 @@ export const merchantListQuerySchema = z.object({
 export const couponRequestSchema = z.object({
   merchantId: z.string().min(1),
   context: z.record(z.string(), z.unknown()),
-  userIntent: z.string().min(1).optional(),
-  merchantRules: z.string().min(1).optional(),
+  userIntent: z.string().min(1),
 });
 
 export const couponSavingSchema = z.discriminatedUnion("type", [

@@ -49,7 +49,7 @@ export function createLlmCouponGenerator(
   const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
 
   return {
-    async generate({ merchantId, context, userIntent, merchantRules }) {
+    async generate({ merchantId, context, userIntent }) {
       if (!config.apiKey) {
         throw httpError(
           503,
@@ -73,9 +73,7 @@ export function createLlmCouponGenerator(
         baseUrl,
         apiKey: config.apiKey,
         model: config.model,
-        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${
-          merchantRules ?? merchant.rules
-        }`,
+        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${merchant.rules}`,
         user: buildUserMessage(merchant, context, userIntent),
       });
 
@@ -115,20 +113,19 @@ function buildUserMessage(
     longitude: number;
   },
   context: Record<string, unknown>,
-  userIntent?: string,
+  userIntent: string,
 ) {
   return [
     `Merchant: ${merchant.description}`,
     `City: ${merchant.cityId}`,
     `Coordinates: ${merchant.latitude}, ${merchant.longitude}`,
-    userIntent ? `Next user intent from local model: ${userIntent}` : null,
+    `Next user intent from local model: ${userIntent}`,
     "",
     "User context (anonymised, device-supplied):",
     JSON.stringify(context, null, 2),
     "",
     "Generate the coupon JSON now.",
   ]
-    .filter((line): line is string => line !== null)
     .join("\n");
 }
 

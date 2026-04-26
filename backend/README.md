@@ -91,7 +91,6 @@ Body:
 {
   "merchantId": "merchant-cafe-traxlmayr",
   "userIntent": "want_coffee",
-  "merchantRules": "Optional markdown rules supplied by the client for this request.",
   "context": { "weather": "rain", "timeOfDay": "morning" }
 }
 ```
@@ -99,9 +98,8 @@ Body:
 `context` is a free-form JSON object the device sends. `userIntent` is the next
 intent chosen by the local device model, and `merchantId` is the merchant chosen
 by that same local model. The server forwards those values to OpenRouter along
-with the merchant and authoritative markdown rules. If `merchantRules` is
-provided, it is used for this request; otherwise the server uses the rules stored
-for the merchant. Response:
+with the merchant and authoritative markdown rules loaded from backend
+configuration for that merchant. Response:
 
 ```json
 {
