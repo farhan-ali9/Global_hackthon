@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,11 +27,20 @@ type Question = {
   icon: IoniconsName;
   title: string;
   subtitle: string;
-  multi: boolean;
-  options: { id: string; label: string; icon: IoniconsName }[];
+  /** text = free-text input step; options = choice grid step */
+  type?: "text" | "options";
+  multi?: boolean;
+  options?: { id: string; label: string; icon: IoniconsName }[];
 };
 
 const QUESTIONS: Question[] = [
+  {
+    id: "name",
+    icon: "person-circle-outline",
+    title: "What's your name?",
+    subtitle: "We'll use it to personalise your experience",
+    type: "text",
+  },
   {
     id: "gender",
     icon: "person-outline",
@@ -131,17 +141,19 @@ export default function OnboardingQuestionnaire() {
 
   const [step, setStep]       = useState(0);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  const [name, setName]       = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   // Animated progress bar width (0→1)
-  const progressAnim = useRef(new Animated.Value(1 / QUESTIONS.length)).current;
+  const progressAnim = useRef(new Animated.Value(1 / QUESTIONS.length)).current; // QUESTIONS.length now includes name step
   // Slide animation
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  const q = QUESTIONS[step];
+  const q        = QUESTIONS[step];
   const selected = answers[q.id] ?? [];
   const isLast   = step === QUESTIONS.length - 1;
-  const canNext  = selected.length > 0;
+  const isNameStep = q.type === "text";
+  const canNext  = isNameStep ? name.trim().length > 0 : selected.length > 0;
 
   function animateToStep(nextStep: number, direction: 1 | -1) {
     // Slide out current
@@ -169,6 +181,7 @@ export default function OnboardingQuestionnaire() {
   }
 
   function toggleOption(optId: string) {
+    if (isNameStep) return;
     const prev = answers[q.id] ?? [];
     let next: string[];
     if (q.multi) {
@@ -185,18 +198,26 @@ export default function OnboardingQuestionnaire() {
       setIsSaving(true);
       try {
         await saveUserProfile(
-          QUESTIONS.map((question) => ({
-            questionId: question.id,
-            questionTitle: question.title,
-            selectedOptions: (answers[question.id] ?? []).map((optionId) => {
-              const option = question.options.find((candidate) => candidate.id === optionId);
-
+          QUESTIONS.map((question) => {
+            if (question.type === "text") {
               return {
-                id: optionId,
-                label: option?.label ?? optionId,
+                questionId: question.id,
+                questionTitle: question.title,
+                selectedOptions: [{ id: question.id, label: name.trim() }],
               };
-            }),
-          })),
+            }
+            return {
+              questionId: question.id,
+              questionTitle: question.title,
+              selectedOptions: (answers[question.id] ?? []).map((optionId) => {
+                const option = question.options?.find((candidate) => candidate.id === optionId);
+                return {
+                  id: optionId,
+                  label: option?.label ?? optionId,
+                };
+              }),
+            };
+          }),
         );
         router.replace("/(tabs)" as Href);
       } finally {
@@ -273,47 +294,72 @@ export default function OnboardingQuestionnaire() {
           )}
         </View>
 
-        {/* Options grid */}
-        <ScrollView
-          style={styles.optionsScroll}
-          contentContainerStyle={styles.optionsGrid}
-          showsVerticalScrollIndicator={false}
-        >
-          {q.options.map((opt) => {
-            const isSelected = selected.includes(opt.id);
-            return (
-              <Pressable
-                key={opt.id}
-                style={({ pressed }) => [
-                  styles.optionTile,
-                  isSelected && styles.optionTileSelected,
-                  pressed && styles.optionTilePressed,
-                ]}
-                onPress={() => toggleOption(opt.id)}
-              >
-                <Ionicons
-                  name={opt.icon}
-                  size={22}
-                  color={isSelected ? "#fff" : CW.text}
-                  style={styles.optionIcon}
-                />
-                <Text
-                  style={[
-                    styles.optionLabel,
-                    isSelected && styles.optionLabelSelected,
-                  ]}
-                >
-                  {opt.label}
+        {/* Name input — step 0 only */}
+        {isNameStep ? (
+          <View style={styles.nameInputWrap}>
+            <TextInput
+              style={styles.nameInput}
+              placeholder="e.g. Sofia"
+              placeholderTextColor={CW.soft}
+              value={name}
+              onChangeText={setName}
+              autoFocus
+              autoCapitalize="words"
+              returnKeyType="done"
+              onSubmitEditing={handleNext}
+              maxLength={40}
+            />
+            {name.trim().length > 0 && (
+              <View style={styles.namePreview}>
+                <Text style={styles.namePreviewText}>
+                  Nice to meet you, {name.trim()} 👋
                 </Text>
-                {isSelected && (
-                  <View style={styles.checkDot}>
-                    <Ionicons name="checkmark" size={10} color="#fff" />
-                  </View>
-                )}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+              </View>
+            )}
+          </View>
+        ) : (
+          /* Options grid */
+          <ScrollView
+            style={styles.optionsScroll}
+            contentContainerStyle={styles.optionsGrid}
+            showsVerticalScrollIndicator={false}
+          >
+            {(q.options ?? []).map((opt) => {
+              const isSelected = selected.includes(opt.id);
+              return (
+                <Pressable
+                  key={opt.id}
+                  style={({ pressed }) => [
+                    styles.optionTile,
+                    isSelected && styles.optionTileSelected,
+                    pressed && styles.optionTilePressed,
+                  ]}
+                  onPress={() => toggleOption(opt.id)}
+                >
+                  <Ionicons
+                    name={opt.icon}
+                    size={22}
+                    color={isSelected ? "#fff" : CW.text}
+                    style={styles.optionIcon}
+                  />
+                  <Text
+                    style={[
+                      styles.optionLabel,
+                      isSelected && styles.optionLabelSelected,
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                  {isSelected && (
+                    <View style={styles.checkDot}>
+                      <Ionicons name="checkmark" size={10} color="#fff" />
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
       </Animated.View>
 
       {/* ── Next / Finish button ── */}
@@ -491,6 +537,37 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.25)",
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  /* name input step */
+  nameInputWrap: {
+    flex: 1,
+    paddingTop: 8,
+  },
+  nameInput: {
+    fontSize: 28,
+    fontWeight: "300",
+    color: CW.text,
+    fontFamily: fontFamily.regular,
+    borderBottomWidth: 2,
+    borderBottomColor: CW.text,
+    paddingVertical: 12,
+    paddingHorizontal: 2,
+    letterSpacing: -0.5,
+  },
+  namePreview: {
+    marginTop: 20,
+    backgroundColor: CW.bgAlt,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: CW.border,
+  },
+  namePreviewText: {
+    fontSize: 15,
+    color: CW.text,
+    fontFamily: fontFamily.medium,
   },
 
   /* footer */
