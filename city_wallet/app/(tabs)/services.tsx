@@ -26,7 +26,7 @@ export default function ServicesScreen() {
           City{" "}
           <Text style={styles.titleItalic}>Services</Text>
         </Text>
-        <Text style={styles.subtitle}>Munich · Your local services</Text>
+        <Text style={styles.subtitle}>Linz · Your local services</Text>
       </View>
 
       {/* Search */}

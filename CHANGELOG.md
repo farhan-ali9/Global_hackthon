@@ -11,6 +11,10 @@
 - Added a local merchant recommender adapter for React Native AI/GGUF model
   integration and wired the app root to select a merchant locally before coupon
   generation.
+- Derived frontend `cityId` and `zoneId` from device coordinates using
+  configured city bounds instead of a direct hardcoded assignment.
+- Replaced the demo city with Linz, Austria (`linz-demo`) across frontend
+  context defaults, map mock pins, and backend merchant seed data.
 
 ## 2026-04-25
 
@@ -29,7 +33,6 @@
 - Added `POST /coupons/generate` accepting `{merchantId, context}` and
   calling OpenRouter via built-in `fetch` with the merchant's markdown
   rules as authoritative system-prompt constraints. No DB persistence.
-- Reseeded with 6 mock Stuttgart merchants (cafe, bistro, bookshop,
-  gelateria, museum shop, bike rental), each with a markdown `rules`
-  block.
+- Seeded the initial merchant dataset with 6 mock demo merchants, each with a
+  markdown `rules` block.
 - New env vars: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`.

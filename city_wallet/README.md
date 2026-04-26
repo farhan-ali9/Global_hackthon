@@ -56,7 +56,8 @@ The root layout wraps the app in `UserContextLoopProvider`. On mount, and then
 every 10 seconds, the provider:
 
 1. Builds a `UserContext` with precise coordinates, local time, timezone,
-   weather bucket/details, intent labels, and demand tags.
+   coordinate-derived city/zone ids, weather bucket/details, intent labels, and
+   demand tags.
 2. Calls `GET /merchants?cityId=<id>` to retrieve merchant candidates for the
    user's broad city.
 3. Calls `recommendMerchant({ context, merchants })` in
@@ -71,6 +72,8 @@ every 10 seconds, the provider:
 - Backend work happens in `../backend/`; the app only calls the API.
 - Context work should replace the placeholder weather provider with a real local
   or API-backed weather source.
+- Add new supported city bounding boxes in `ContextProvider.ts` when the backend
+  is seeded with additional `cityId` values.
 - AI work on-device should implement the `LocalMerchantModelClient` contract and
   return a merchant id from the candidate list.
 - Backend generation returns typed coupon JSON, not remote executable UI code.
