@@ -7,11 +7,12 @@ import type {
 export type LocalMerchantModelClient = {
   recommendMerchant: (
     request: LocalRecommendationRequest,
+    options?: { signal?: AbortSignal },
   ) => Promise<LocalRecommendationResponse>;
 };
 
 let localMerchantModelClient: LocalMerchantModelClient | null = null;
-const LOCAL_MODEL_TIMEOUT_MS = 30_000;
+const LOCAL_MODEL_OPERATION_TIMEOUT_MS = 180_000;
 const MAX_MERCHANTS_IN_PROMPT = 10;
 const MAX_DESCRIPTION_CHARS = 140;
 const MAX_PROMPT_CHARS = 6_000;
@@ -35,11 +36,12 @@ export async function recommendMerchant(
   if (localMerchantModelClient === null) {
     return getFallbackRecommendation(request);
   }
+  const modelClient = localMerchantModelClient;
 
   try {
     const recommendation = await withTimeout(
-      localMerchantModelClient.recommendMerchant(request),
-      LOCAL_MODEL_TIMEOUT_MS,
+      (signal) => modelClient.recommendMerchant(request, { signal }),
+      LOCAL_MODEL_OPERATION_TIMEOUT_MS,
     );
 
     return validateRecommendation(request, recommendation);
@@ -160,13 +162,18 @@ function getFallbackReasoningTags(error: unknown) {
   return ["fallback_nearest_merchant", "model_error_fallback"];
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+function withTimeout<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
   return new Promise((resolve, reject) => {
+    const controller = new AbortController();
     const timeoutId = setTimeout(() => {
+      controller.abort();
       reject(new Error("Local model timed out"));
     }, timeoutMs);
 
-    promise
+    operation(controller.signal)
       .then(resolve, reject)
       .finally(() => clearTimeout(timeoutId));
   });

@@ -11,6 +11,7 @@
     "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "start:migrate": "prisma migrate deploy && node dist/index.js",
+    "test": "npm run typecheck && npm run simulate:user-context -- --durationMinutes=1 --stepSeconds=60",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

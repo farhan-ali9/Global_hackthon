@@ -59,8 +59,11 @@ let preparedModelId: string | null = null;
 let preparePromise: Promise<LlamaLanguageModel> | null = null;
 let preparingModelId: string | null = null;
 const PIPELINE_LOG_PREVIEW_CHARS = 1400;
+const MODEL_GENERATION_TIMEOUT_MS = 30_000;
 const ENABLE_FULL_PIPELINE_LOGS =
   process.env.EXPO_PUBLIC_LOCAL_MODEL_PIPELINE_FULL_LOGS?.toLowerCase() === "true";
+const ENABLE_STRUCTURED_OUTPUT =
+  process.env.EXPO_PUBLIC_LOCAL_MODEL_STRUCTURED_OUTPUT?.toLowerCase() === "true";
 
 export function registerReactNativeAiMerchantModelClient() {
   if (Constants.appOwnership === "expo") {
@@ -82,27 +85,58 @@ export function registerReactNativeAiMerchantModelClient() {
 
 function createReactNativeAiMerchantModelClient(): LocalMerchantModelClient {
   return {
-    async recommendMerchant(request) {
+    async recommendMerchant(request, options) {
       const requestId = createPipelineRequestId();
       const modelId = getConfiguredModelId();
-      const model = await getPreparedModel(modelId);
-      const prompt = buildLocalModelPrompt(request);
+      const abortSignal = options?.signal;
       logModelPipeline("request_start", {
         requestId,
         modelId,
         merchantCount: request.merchants.length,
-        rankingSignalCount: request.localRankingSignals.length,
       });
+      logModelPipeline("prepare_start", { requestId, modelId });
+      const model = await getPreparedModel(modelId);
+      logModelPipeline("prepare_success", { requestId, modelId });
+      const prompt = buildLocalModelPrompt(request);
       let recommendation: ModelRecommendationPayload;
-      try {
-        recommendation = await generateStructuredRecommendation(model, prompt, modelId, requestId);
-      } catch (structuredError) {
+      if (ENABLE_STRUCTURED_OUTPUT) {
+        try {
+          recommendation = await generateStructuredRecommendation(
+            model,
+            prompt,
+            modelId,
+            requestId,
+            abortSignal,
+          );
+        } catch (structuredError) {
+          if (isAbortError(structuredError)) {
+            logModelPipeline("request_failure", {
+              requestId,
+              modelId,
+              reason: "aborted_during_structured_generation",
+              structuredError,
+            });
+            throw structuredError;
+          }
+          recommendation = await generateTextRecommendation(
+            model,
+            prompt,
+            modelId,
+            requestId,
+            structuredError,
+            abortSignal,
+            "fallback",
+          );
+        }
+      } else {
         recommendation = await generateTextRecommendation(
           model,
           prompt,
           modelId,
           requestId,
-          structuredError,
+          "structured output disabled for local model",
+          abortSignal,
+          "text",
         );
       }
 
@@ -118,15 +152,24 @@ async function generateStructuredRecommendation(
   prompt: string,
   modelId: string,
   requestId: string,
+  abortSignal?: AbortSignal,
 ) {
   logModelPipeline("structured_input", { requestId, modelId, promptLength: prompt.length, prompt });
-  const { output } = await generateText({
-    model,
-    prompt,
-    temperature: 0.1,
-    maxOutputTokens: 256,
-    output: RESPONSE_OUTPUT,
-  });
+  const { output } = await withGenerationTimeout(
+    requestId,
+    modelId,
+    "structured_generation",
+    abortSignal,
+    (signal) =>
+      generateText({
+        model,
+        prompt,
+        temperature: 0.1,
+        maxOutputTokens: 256,
+        output: RESPONSE_OUTPUT,
+        abortSignal: signal,
+      }),
+  );
   logModelPipeline("structured_output", { requestId, modelId, output });
   return output;
 }
@@ -137,26 +180,38 @@ async function generateTextRecommendation(
   modelId: string,
   requestId: string,
   structuredError: unknown,
+  abortSignal?: AbortSignal,
+  stagePrefix = "fallback",
 ) {
-  console.info(
-    "Structured local-model parsing failed; using tolerant JSON extraction fallback.",
-    structuredError,
-  );
+  if (stagePrefix === "fallback") {
+    console.info(
+      "Structured local-model parsing failed; using tolerant JSON extraction fallback.",
+      structuredError,
+    );
+  }
   const fallbackPrompt = `${prompt}\n\nReturn only one JSON object and nothing else.`;
-  logModelPipeline("fallback_input", {
+  logModelPipeline(`${stagePrefix}_input`, {
     requestId,
     modelId,
-    structuredError,
+    triggerReason: structuredError,
     promptLength: fallbackPrompt.length,
     prompt: fallbackPrompt,
   });
-  const { text } = await generateText({
-    model,
-    prompt: fallbackPrompt,
-    temperature: 0.05,
-    maxOutputTokens: 192,
-  });
-  logModelPipeline("fallback_output_raw_text", {
+  const { text } = await withGenerationTimeout(
+    requestId,
+    modelId,
+    "fallback_generation",
+    abortSignal,
+    (signal) =>
+      generateText({
+        model,
+        prompt: fallbackPrompt,
+        temperature: 0.05,
+        maxOutputTokens: 192,
+        abortSignal: signal,
+      }),
+  );
+  logModelPipeline(`${stagePrefix}_output_raw_text`, {
     requestId,
     modelId,
     textLength: text.length,
@@ -164,12 +219,12 @@ async function generateTextRecommendation(
   });
 
   const parsed = extractJsonObjectFromText(text);
-  logModelPipeline("fallback_output_parsed_json", { requestId, modelId, parsed });
+  logModelPipeline(`${stagePrefix}_output_parsed_json`, { requestId, modelId, parsed });
   if (!isModelRecommendationPayload(parsed)) {
     logModelPipeline("request_failure", {
       requestId,
       modelId,
-      reason: "fallback_parse_invalid_payload",
+      reason: `${stagePrefix}_parse_invalid_payload`,
       textLength: text.length,
       text,
       parsed,
@@ -258,6 +313,52 @@ function getConfiguredModelId() {
 
 function createPipelineRequestId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function withGenerationTimeout<T>(
+  requestId: string,
+  modelId: string,
+  stage: string,
+  parentSignal: AbortSignal | undefined,
+  operation: (signal: AbortSignal) => Promise<T>,
+) {
+  const controller = new AbortController();
+  const abortFromParent = () => controller.abort();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      logModelPipeline("request_failure", {
+        requestId,
+        modelId,
+        reason: `${stage}_timeout`,
+        timeoutMs: MODEL_GENERATION_TIMEOUT_MS,
+      });
+      controller.abort();
+      reject(new Error(`Local model ${stage} timed out`));
+    }, MODEL_GENERATION_TIMEOUT_MS);
+  });
+
+  if (parentSignal?.aborted) {
+    controller.abort();
+  } else {
+    parentSignal?.addEventListener("abort", abortFromParent, { once: true });
+  }
+
+  try {
+    return await Promise.race([operation(controller.signal), timeoutPromise]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+    parentSignal?.removeEventListener("abort", abortFromParent);
+  }
+}
+
+function isAbortError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.name === "AbortError" || error.message.toLowerCase().includes("aborted"))
+  );
 }
 
 function logModelPipeline(stage: string, payload: Record<string, unknown>) {
