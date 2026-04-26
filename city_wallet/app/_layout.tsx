@@ -87,8 +87,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <UserContextLoopProvider>
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="(tabs)" />
           <Stack.Screen
             name="scan"
             options={{ presentation: "modal", animation: "slide_from_bottom" }}
