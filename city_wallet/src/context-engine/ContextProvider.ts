@@ -59,27 +59,9 @@ export const deviceContextProvider: ContextProvider = {
     if (cachedWeather) {
       weather = cachedWeather;
     } else {
-      const weatherResponse = await getWeatherFromGps(
-        coordinates.latitude,
-        coordinates.longitude,
-      );
-
-      weather = {
-        bucket: weatherResponse.weather.weatherBucket,
-        label: weatherResponse.weather.description,
-        temperatureCelsius: weatherResponse.weather.temperature,
-        precipitationProbability: weatherResponse.weather.condition
-          .toLowerCase()
-          .includes("rain")
-          ? 0.8
-          : 0.1,
-        source: "weather_api",
-      };
-
+      weather = await getWeatherWithFallback(coordinates);
       cachedWeather = weather;
     }
-  console.log("GPS:", coordinates);
-console.log("WEATHER:", weather);
     const timeOfDay = getTimeOfDay(now);
     const dayOfWeek = now.toLocaleDateString("en-US", { weekday: "long" });
     const profile = await getUserProfile();
@@ -108,6 +90,35 @@ console.log("WEATHER:", weather);
 };
 
 export const mockContextProvider = deviceContextProvider;
+
+async function getWeatherWithFallback(coordinates: Coordinates): Promise<WeatherSituation> {
+  try {
+    const weatherResponse = await getWeatherFromGps(
+      coordinates.latitude,
+      coordinates.longitude,
+    );
+    return {
+      bucket: weatherResponse.weather.weatherBucket,
+      label: weatherResponse.weather.description,
+      temperatureCelsius: weatherResponse.weather.temperature,
+      precipitationProbability: weatherResponse.weather.condition
+        .toLowerCase()
+        .includes("rain")
+        ? 0.8
+        : 0.1,
+      source: "weather_api",
+    };
+  } catch (error) {
+    console.warn("Weather API unavailable, using fallback weather.", error);
+    return {
+      bucket: "cloudy",
+      label: "weather unavailable",
+      temperatureCelsius: 14,
+      precipitationProbability: 0.2,
+      source: "placeholder",
+    };
+  }
+}
 
 async function getCurrentLocation() {
   const { status } = await Location.requestForegroundPermissionsAsync();

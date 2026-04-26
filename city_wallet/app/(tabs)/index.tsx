@@ -1,53 +1,38 @@
-import { useRouter, type Href } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MapPreviewCard } from "@/src/components/MapPreviewCard";
-import { COUPONS, REDEEMED_COUPONS } from "@/src/data/mockData";
-import type { Coupon } from "@/src/types/city-wallet";
+import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
+import { getUserProfile } from "@/src/storage/userProfileStorage";
 import { CW, fontFamily } from "@/src/theme/tokens";
-
-/* ── derived stats ── */
-const totalSaved = REDEEMED_COUPONS.filter((c) => c.savings).reduce((sum, c) => {
-  return sum + parseFloat((c.savings ?? "€0").replace(/[^0-9.]/g, ""));
-}, 0);
+import type { UserProfile } from "@/src/types/city-wallet";
 
 const POINTS = 1_240;
 
-/* ── compact redeemed-coupon row ── */
-function RecentRow({ coupon, onPress }: { coupon: Coupon; onPress: () => void }) {
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.recentRow, pressed && styles.pressed]}
-      onPress={onPress}
-    >
-      {/* Logo circle */}
-      <View style={[styles.recentLogo, { backgroundColor: coupon.brandColor }]}>
-        <Text style={styles.recentLogoText}>{coupon.logoLetter}</Text>
-      </View>
-
-      {/* Info */}
-      <View style={styles.recentInfo}>
-        <Text style={styles.recentCompany}>{coupon.company}</Text>
-        <Text style={styles.recentOffer} numberOfLines={1}>
-          {coupon.offer} — {coupon.offerDetail}
-        </Text>
-      </View>
-
-      {/* Right */}
-      <View style={styles.recentRight}>
-        {coupon.savings && (
-          <Text style={styles.recentSavings}>−{coupon.savings}</Text>
-        )}
-        <Text style={styles.recentTime}>{coupon.redeemedAt?.split(",")[0] ?? ""}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const { merchants, recommendation, context, status, error } = useUserContextLoop();
+  const [storedProfile, setStoredProfile] = useState<UserProfile | null>(null);
+  const profile = storedProfile ?? context?.profile ?? null;
+  const displayName = profile?.displayName || "City Wallet user";
+  const avatarInitial = useMemo(() => getAvatarInitial(displayName), [displayName]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getUserProfile()
+      .then((nextProfile) => {
+        if (isMounted) setStoredProfile(nextProfile);
+      })
+      .catch(() => {
+        if (isMounted) setStoredProfile(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -55,10 +40,10 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Good morning</Text>
-          <Text style={styles.name}>Sofia M.</Text>
+          <Text style={styles.name}>{displayName}</Text>
         </View>
         <View style={styles.avatarCircle}>
-          <Text style={styles.avatarText}>S</Text>
+          <Text style={styles.avatarText}>{avatarInitial}</Text>
         </View>
       </View>
 
@@ -85,17 +70,17 @@ export default function HomeScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>Saved</Text>
-              <Text style={styles.statValue}>€ {totalSaved.toFixed(2)}</Text>
+              <Text style={styles.statValue}>€ 0.00</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
-              <Text style={styles.statLabel}>Redeemed</Text>
-              <Text style={styles.statValue}>{REDEEMED_COUPONS.length}</Text>
+              <Text style={styles.statLabel}>Pipeline</Text>
+              <Text style={styles.statValue}>{status}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
-              <Text style={styles.statLabel}>Available</Text>
-              <Text style={styles.statValue}>{COUPONS.length}</Text>
+              <Text style={styles.statLabel}>Merchants</Text>
+              <Text style={styles.statValue}>{merchants.length}</Text>
             </View>
           </View>
         </View>
@@ -105,37 +90,28 @@ export default function HomeScreen() {
 
         {/* ── Recent section ── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>Recently Redeemed</Text>
-          <Pressable
-            style={({ pressed }) => [styles.seeAllBtn, pressed && styles.pressed]}
-            onPress={() => router.push("/(tabs)/activity" as Href)}
-          >
-            <Text style={styles.seeAllText}>See all →</Text>
-          </Pressable>
+          <Text style={styles.sectionLabel}>Current Context</Text>
         </View>
 
-        {REDEEMED_COUPONS.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>No redeemed coupons yet. Browse the Coupons tab!</Text>
-          </View>
-        ) : (
-          <View style={styles.recentList}>
-            {REDEEMED_COUPONS.map((c, i, arr) => (
-              <View key={c.id}>
-                <RecentRow
-                  coupon={c}
-                  onPress={() => router.push(`/coupon/${c.id}` as Href)}
-                />
-                {i < arr.length - 1 && <View style={styles.divider} />}
-              </View>
-            ))}
-          </View>
-        )}
+        <View style={styles.empty}>
+          <Text style={styles.emptyText}>City: {context?.cityId ?? "n/a"} · Zone: {context?.zoneId ?? "n/a"}</Text>
+          <Text style={styles.emptyText}>Weather: {context?.weather.label ?? "n/a"} · {context?.weatherBucket ?? "n/a"}</Text>
+          <Text style={styles.emptyText}>Recommended merchant: {recommendation?.merchantId ?? "none yet"}</Text>
+          {error ? (
+            <Text style={[styles.emptyText, { color: "#9c2a2a" }]}>{error}</Text>
+          ) : (
+            <Text style={styles.emptyText}>Offer generation is intentionally disabled for now.</Text>
+          )}
+        </View>
 
         <View style={{ height: 12 }} />
       </ScrollView>
     </View>
   );
+}
+
+function getAvatarInitial(displayName: string) {
+  return displayName.trim().charAt(0).toUpperCase() || "U";
 }
 
 const styles = StyleSheet.create({
@@ -274,80 +250,6 @@ const styles = StyleSheet.create({
     color: CW.soft,
     fontFamily: fontFamily.semibold,
   },
-  seeAllBtn: {},
-  seeAllText: {
-    fontSize: 12,
-    color: CW.mid,
-    fontWeight: "500",
-    fontFamily: fontFamily.medium,
-  },
-
-  /* ── recent list ── */
-  recentList: {
-    backgroundColor: CW.bg,
-    borderRadius: 20,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: CW.border,
-    ...({
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 10,
-      elevation: 2,
-    } as object),
-  },
-  recentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    gap: 12,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: CW.border,
-    marginLeft: 64,
-  },
-  recentLogo: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  recentLogoText: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#fff",
-    fontFamily: fontFamily.extrabold,
-  },
-  recentInfo: { flex: 1, gap: 3 },
-  recentCompany: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: CW.text,
-    fontFamily: fontFamily.bold,
-  },
-  recentOffer: {
-    fontSize: 12,
-    color: CW.soft,
-    fontFamily: fontFamily.regular,
-  },
-  recentRight: { alignItems: "flex-end", gap: 3 },
-  recentSavings: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: CW.green,
-    fontFamily: fontFamily.bold,
-  },
-  recentTime: {
-    fontSize: 10,
-    color: CW.soft,
-    fontFamily: fontFamily.regular,
-  },
-
   /* empty */
   empty: {
     backgroundColor: CW.bg,
@@ -363,6 +265,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: fontFamily.regular,
   },
-
-  pressed: { opacity: 0.7 },
 });

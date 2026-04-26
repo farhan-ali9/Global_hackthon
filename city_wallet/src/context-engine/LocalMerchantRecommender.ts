@@ -7,11 +7,15 @@ import type {
 export type LocalMerchantModelClient = {
   recommendMerchant: (
     request: LocalRecommendationRequest,
+    options?: { signal?: AbortSignal },
   ) => Promise<LocalRecommendationResponse>;
 };
 
 let localMerchantModelClient: LocalMerchantModelClient | null = null;
-const LOCAL_MODEL_TIMEOUT_MS = 30_000;
+const LOCAL_MODEL_OPERATION_TIMEOUT_MS = 180_000;
+const MAX_MERCHANTS_IN_PROMPT = 10;
+const MAX_DESCRIPTION_CHARS = 140;
+const MAX_PROMPT_CHARS = 6_000;
 
 export type LocalRankingSignal = {
   merchantId: string;
@@ -32,11 +36,12 @@ export async function recommendMerchant(
   if (localMerchantModelClient === null) {
     return getFallbackRecommendation(request);
   }
+  const modelClient = localMerchantModelClient;
 
   try {
     const recommendation = await withTimeout(
-      localMerchantModelClient.recommendMerchant(request),
-      LOCAL_MODEL_TIMEOUT_MS,
+      (signal) => modelClient.recommendMerchant(request, { signal }),
+      LOCAL_MODEL_OPERATION_TIMEOUT_MS,
     );
 
     return validateRecommendation(request, recommendation);
@@ -48,7 +53,11 @@ export async function recommendMerchant(
 }
 
 export function buildLocalModelPrompt(request: LocalRecommendationRequest) {
-  return [
+  const rankingSignals = buildLocalRankingSignals(request);
+  const compactContext = buildCompactContext(request);
+  const compactSignals = rankingSignals.slice(0, MAX_MERCHANTS_IN_PROMPT);
+  const compactMerchants = buildCompactMerchants(request, compactSignals);
+  const prompt = [
     "Rank the best local merchant for this private on-device user context.",
     "Use the user context, merchant summaries, and computed local ranking signals.",
     "Return JSON only with this shape:",
@@ -56,14 +65,20 @@ export function buildLocalModelPrompt(request: LocalRecommendationRequest) {
     "merchantId must be one of the provided merchant ids. Do not include markdown or explanation text.",
     "",
     "User context:",
-    JSON.stringify(request.context, null, 2),
+    JSON.stringify(compactContext),
     "",
     "Local ranking signals:",
-    JSON.stringify(buildLocalRankingSignals(request), null, 2),
+    JSON.stringify(compactSignals),
     "",
     "Merchants:",
-    JSON.stringify(request.merchants, null, 2),
+    JSON.stringify(compactMerchants),
   ].join("\n");
+
+  if (prompt.length <= MAX_PROMPT_CHARS) {
+    return prompt;
+  }
+
+  return `${prompt.slice(0, MAX_PROMPT_CHARS)}\n\n[Prompt truncated to fit local model context window]`;
 }
 
 export function buildLocalRankingSignals(
@@ -147,13 +162,18 @@ function getFallbackReasoningTags(error: unknown) {
   return ["fallback_nearest_merchant", "model_error_fallback"];
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+function withTimeout<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
   return new Promise((resolve, reject) => {
+    const controller = new AbortController();
     const timeoutId = setTimeout(() => {
+      controller.abort();
       reject(new Error("Local model timed out"));
     }, timeoutMs);
 
-    promise
+    operation(controller.signal)
       .then(resolve, reject)
       .finally(() => clearTimeout(timeoutId));
   });
@@ -183,4 +203,45 @@ function distanceToUserMeters(
 
 function toRadians(degrees: number) {
   return (degrees * Math.PI) / 180;
+}
+
+function buildCompactContext(request: LocalRecommendationRequest) {
+  const { context } = request;
+  return {
+    cityId: context.cityId,
+    zoneId: context.zoneId,
+    timeOfDay: context.timeOfDay,
+    dayOfWeek: context.dayOfWeek,
+    isWeekend: context.isWeekend,
+    weatherBucket: context.weatherBucket,
+    intentLabels: context.intentLabels.slice(0, 6),
+    demandTags: context.demandTags.slice(0, 6),
+    mobilityState: context.mobilityState,
+    coordinates: {
+      latitude: roundTo(context.coordinates.latitude, 4),
+      longitude: roundTo(context.coordinates.longitude, 4),
+    },
+  };
+}
+
+function buildCompactMerchants(
+  request: LocalRecommendationRequest,
+  compactSignals: LocalRankingSignal[],
+) {
+  const compactSignalMap = new Map(
+    compactSignals.map((signal) => [signal.merchantId, signal.distanceMeters]),
+  );
+  return request.merchants
+    .filter((merchant) => compactSignalMap.has(merchant.id))
+    .map((merchant) => ({
+      id: merchant.id,
+      cityId: merchant.cityId,
+      distanceMeters: compactSignalMap.get(merchant.id),
+      description: merchant.description.slice(0, MAX_DESCRIPTION_CHARS),
+    }));
+}
+
+function roundTo(value: number, decimals: number) {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
 }

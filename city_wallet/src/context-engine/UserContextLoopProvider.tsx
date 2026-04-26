@@ -9,9 +9,8 @@ import {
   type PropsWithChildren,
 } from "react";
 
-import { generateCoupon, getMerchants } from "@/src/lib/api";
+import { getMerchants } from "@/src/lib/api";
 import type {
-  GeneratedCouponResponse,
   LocalRecommendationResponse,
   MerchantSummary,
   UserContext,
@@ -29,7 +28,6 @@ type UserContextLoopState = {
   context: UserContext | null;
   merchants: MerchantSummary[];
   recommendation: LocalRecommendationResponse | null;
-  coupon: GeneratedCouponResponse | null;
   lastUpdatedAt: string | null;
   error: string | null;
   refreshNow: () => Promise<void>;
@@ -43,7 +41,6 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
   const [merchants, setMerchants] = useState<MerchantSummary[]>([]);
   const [recommendation, setRecommendation] =
     useState<LocalRecommendationResponse | null>(null);
-  const [coupon, setCoupon] = useState<GeneratedCouponResponse | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isRefreshingRef = useRef(false);
@@ -57,26 +54,42 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
     setError(null);
 
     try {
-      const nextContext = await deviceContextProvider.getUserContext();
+      let nextContext: UserContext;
+      try {
+        nextContext = await deviceContextProvider.getUserContext();
+      } catch (error) {
+        throw new Error(withCause("Failed to build user context", error));
+      }
       if (isMountedRef.current) {
         setContext(nextContext);
       }
 
-      const nextMerchants = await getMerchants(nextContext.cityId);
-      const nextRecommendation = await recommendMerchant({
-        context: nextContext,
-        merchants: nextMerchants,
-      });
-      const nextCoupon = await generateCoupon({
-        merchantId: nextRecommendation.merchantId,
-        context: buildBackendCouponContext(nextContext, nextRecommendation),
-      });
+      let nextMerchants: MerchantSummary[];
+      try {
+        nextMerchants = await getMerchants(nextContext.cityId);
+      } catch (error) {
+        throw new Error(
+          withCause(
+            `Failed to fetch merchants for city "${nextContext.cityId}"`,
+            error,
+          ),
+        );
+      }
+
+      let nextRecommendation: LocalRecommendationResponse;
+      try {
+        nextRecommendation = await recommendMerchant({
+          context: nextContext,
+          merchants: nextMerchants,
+        });
+      } catch (error) {
+        throw new Error(withCause("Failed to recommend merchant", error));
+      }
 
       if (!isMountedRef.current) return;
 
       setMerchants(nextMerchants);
       setRecommendation(nextRecommendation);
-      setCoupon(nextCoupon);
       setLastUpdatedAt(new Date().toISOString());
       setStatus("ready");
     } catch (refreshError) {
@@ -113,7 +126,6 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
       context,
       merchants,
       recommendation,
-      coupon,
       lastUpdatedAt,
       error,
       refreshNow,
@@ -123,7 +135,6 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
       context,
       merchants,
       recommendation,
-      coupon,
       lastUpdatedAt,
       error,
       refreshNow,
@@ -137,6 +148,13 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
   );
 }
 
+function withCause(message: string, error: unknown) {
+  if (error instanceof Error && error.message) {
+    return `${message}: ${error.message}`;
+  }
+  return message;
+}
+
 export function useUserContextLoop() {
   const value = useContext(UserContextLoopContext);
   if (value === null) {
@@ -146,27 +164,3 @@ export function useUserContextLoop() {
   return value;
 }
 
-function buildBackendCouponContext(
-  context: UserContext,
-  recommendation: LocalRecommendationResponse,
-) {
-  return {
-    cityId: context.cityId,
-    zoneId: context.zoneId,
-    currentTimeIso: context.currentTimeIso,
-    timezone: context.timezone,
-    dayOfWeek: context.dayOfWeek,
-    isWeekend: context.isWeekend,
-    timeOfDay: context.timeOfDay,
-    weatherBucket: context.weatherBucket,
-    weather: context.weather,
-    intentLabels: context.intentLabels,
-    eventTags: context.eventTags,
-    demandTags: context.demandTags,
-    mobilityState: context.mobilityState,
-    localRecommendation: {
-      confidence: recommendation.confidence,
-      reasoningTags: recommendation.reasoningTags,
-    },
-  };
-}

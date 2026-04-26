@@ -6,6 +6,7 @@ import type {
   MerchantSummary,
   RedemptionResponse,
 } from "@/src/types/city-wallet";
+import { Platform } from "react-native";
 export type WeatherBucket = "clear" | "cloudy" | "rain" | "cold" | "hot";
 
 export type WeatherContextResponse = {
@@ -110,18 +111,53 @@ export async function validateRedemption(
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+  const method = options.method ?? "GET";
+  const requestUrl = `${apiBaseUrl}${path}`;
+  let response: Response;
+  try {
+    response = await fetch(requestUrl, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      buildNetworkFailureMessage({
+        method,
+        requestUrl,
+        originalError: error,
+      }),
+    );
+  }
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || `Request failed with ${response.status}`);
+    throw new Error(
+      `Request failed (${response.status}) for ${method} ${requestUrl}${
+        message ? `: ${message}` : ""
+      }`,
+    );
   }
 
   return response.json() as Promise<T>;
+}
+
+function buildNetworkFailureMessage(args: {
+  method: string;
+  requestUrl: string;
+  originalError: unknown;
+}) {
+  const localhostHint =
+    Platform.OS !== "web" &&
+    (apiBaseUrl.includes("localhost") || apiBaseUrl.includes("127.0.0.1"))
+      ? " If running on a physical device, set EXPO_PUBLIC_API_BASE_URL to your computer LAN IP (for example http://192.168.x.x:4000), not localhost."
+      : "";
+  const detail =
+    args.originalError instanceof Error && args.originalError.message
+      ? ` Original error: ${args.originalError.message}`
+      : "";
+
+  return `Network request failed for ${args.method} ${args.requestUrl}.${localhostHint}${detail}`;
 }

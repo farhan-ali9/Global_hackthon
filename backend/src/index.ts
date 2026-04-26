@@ -16,7 +16,7 @@ const corsOrigin = process.env.CORS_ORIGIN ?? "*";
 
 const couponGenerator = createLlmCouponGenerator(prisma, {
   apiKey: process.env.OPENROUTER_API_KEY ?? "",
-  model: process.env.OPENROUTER_MODEL ?? "anthropic/claude-haiku-4-5",
+  model: process.env.OPENROUTER_MODEL ?? "openrouter/free",
 });
 
 app.use(
@@ -41,15 +41,25 @@ app.get("/merchants", async (request, response, next) => {
       orderBy: { id: "asc" },
     });
 
-    const summaries: MerchantSummary[] = merchants.map((merchant) => ({
-      id: merchant.id,
-      description: merchant.description,
-      cityId: merchant.cityId,
-      coordinates: {
-        latitude: merchant.latitude,
-        longitude: merchant.longitude,
-      },
-    }));
+    const summaries: MerchantSummary[] = [];
+    for (const merchant of merchants) {
+      if (
+        merchant.description === null ||
+        merchant.latitude === null ||
+        merchant.longitude === null
+      ) {
+        continue;
+      }
+      summaries.push({
+        id: merchant.id,
+        description: merchant.description,
+        cityId: merchant.cityId,
+        coordinates: {
+          latitude: merchant.latitude,
+          longitude: merchant.longitude,
+        },
+      });
+    }
 
     response.json(summaries);
   } catch (error) {

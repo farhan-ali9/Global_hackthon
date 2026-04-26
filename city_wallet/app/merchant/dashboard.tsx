@@ -4,38 +4,38 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { MetricCard } from "@/src/components/MetricCard";
 import { ProgressBar } from "@/src/components/ProgressBar";
 import { Screen } from "@/src/components/Screen";
-import { demoMerchant, demoOffer } from "@/src/data/mockData";
+import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
 import { color, fontFamily, radii, shadow } from "@/src/theme/tokens";
 
 export default function MerchantDashboardScreen() {
+  const { merchants, recommendation } = useUserContextLoop();
   return (
     <Screen appBarTitle="Merchant">
       <View>
         <Text style={styles.eyebrow}>Merchant view</Text>
-        <Text style={styles.title}>{demoMerchant.name}</Text>
-        <Text style={styles.subtitle}>Offer performance mock dashboard</Text>
+        <Text style={styles.title}>{recommendation?.merchantId ?? "No merchant selected yet"}</Text>
+        <Text style={styles.subtitle}>Pre-offer pipeline dashboard</Text>
       </View>
 
       <View style={styles.metricGrid}>
-        <MetricCard label="Generated" value="42" />
-        <MetricCard label="Accepted" value="18" />
-        <MetricCard label="Redeemed" value="11" />
-        <MetricCard label="Conversion" value="26%" />
+        <MetricCard label="Merchants" value={String(merchants.length)} />
+        <MetricCard label="Generated" value="0" />
+        <MetricCard label="Accepted" value="0" />
+        <MetricCard label="Redeemed" value="0" />
       </View>
 
       <View style={styles.panel}>
         <Text style={styles.systemLabel}>Funnel (accepted → redeemed)</Text>
-        <ProgressBar value={11 / 18} />
+        <ProgressBar value={0} />
         <Text style={styles.caption}>
-          11 of 18 accepted offers were redeemed in this mock period.
+          Funnel tracking will start once offer generation is enabled.
         </Text>
       </View>
 
       <View style={styles.panel}>
         <Text style={styles.sectionTitle}>Active generated offer</Text>
         <Text style={styles.body}>
-          {demoOffer.discountPercent}% off generated for quiet demand and nearby cold
-          weather context.
+          No active offer yet. Merchant recommendation is available, but generation is paused.
         </Text>
       </View>
 

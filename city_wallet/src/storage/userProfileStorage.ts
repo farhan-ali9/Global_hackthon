@@ -9,6 +9,7 @@ export const DEFAULT_AVATAR_COLOR = "#c5a880";
 
 type UserProfileRow = {
   id: string;
+  displayName: string;
   answersJson: string;
   completedAtIso: string;
   updatedAtIso: string;
@@ -16,18 +17,26 @@ type UserProfileRow = {
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
-export async function saveUserProfile(answers: OnboardingAnswer[]) {
+export async function saveUserProfile({
+  displayName,
+  answers,
+}: {
+  displayName: string;
+  answers: OnboardingAnswer[];
+}) {
   const now = new Date().toISOString();
   const db = await getDatabase();
 
   await db.runAsync(
-    `INSERT INTO user_profiles (id, answersJson, completedAtIso, updatedAtIso)
-     VALUES (?, ?, ?, ?)
+    `INSERT INTO user_profiles (id, displayName, answersJson, completedAtIso, updatedAtIso)
+     VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
+       displayName = excluded.displayName,
        answersJson = excluded.answersJson,
        completedAtIso = excluded.completedAtIso,
        updatedAtIso = excluded.updatedAtIso`,
     PROFILE_ID,
+    displayName.trim(),
     JSON.stringify(answers),
     now,
     now,
@@ -37,17 +46,19 @@ export async function saveUserProfile(answers: OnboardingAnswer[]) {
 export async function getUserProfile(): Promise<UserProfile | null> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<UserProfileRow>(
-    `SELECT id, answersJson, completedAtIso, updatedAtIso
+    `SELECT id, displayName, answersJson, completedAtIso, updatedAtIso
      FROM user_profiles
      WHERE id = ?`,
     PROFILE_ID,
   );
 
   if (row === null) return null;
+  const onboardingAnswers = parseAnswers(row.answersJson);
 
   return {
     id: row.id,
-    onboardingAnswers: parseAnswers(row.answersJson),
+    displayName: getDisplayName(row.displayName, onboardingAnswers),
+    onboardingAnswers,
     completedAtIso: row.completedAtIso,
     updatedAtIso: row.updatedAtIso,
   };
@@ -64,6 +75,7 @@ async function openAndMigrateDatabase() {
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS user_profiles (
       id TEXT PRIMARY KEY NOT NULL,
+      displayName TEXT NOT NULL DEFAULT '',
       answersJson TEXT NOT NULL,
       completedAtIso TEXT NOT NULL,
       updatedAtIso TEXT NOT NULL
@@ -77,6 +89,8 @@ async function openAndMigrateDatabase() {
       avatarColor TEXT NOT NULL DEFAULT '${DEFAULT_AVATAR_COLOR}'
     );
   `);
+
+  await addColumnIfMissing(db, "user_profiles", "displayName", "TEXT NOT NULL DEFAULT ''");
 
   return db;
 }
@@ -108,6 +122,18 @@ export async function getPersonalInfo(): Promise<PersonalInfo | null> {
   return row ?? null;
 }
 
+async function addColumnIfMissing(
+  db: SQLite.SQLiteDatabase,
+  tableName: string,
+  columnName: string,
+  columnDefinition: string,
+) {
+  const columns = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${tableName})`);
+  if (columns.some((column) => column.name === columnName)) return;
+
+  await db.execAsync(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition};`);
+}
+
 function parseAnswers(answersJson: string): OnboardingAnswer[] {
   try {
     const parsed: unknown = JSON.parse(answersJson);
@@ -117,6 +143,17 @@ function parseAnswers(answersJson: string): OnboardingAnswer[] {
   } catch {
     return [];
   }
+}
+
+function getDisplayName(displayName: string, answers: OnboardingAnswer[]) {
+  const storedDisplayName = displayName.trim();
+  if (storedDisplayName.length > 0) return storedDisplayName;
+
+  return (
+    answers
+      .find((answer) => answer.questionId === "name")
+      ?.selectedOptions[0]?.label.trim() ?? ""
+  );
 }
 
 function isOnboardingAnswer(value: unknown): value is OnboardingAnswer {

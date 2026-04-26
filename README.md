@@ -46,10 +46,9 @@ phone, set `EXPO_PUBLIC_API_BASE_URL` to your computer's LAN IP instead of
 
 1. The mobile context provider returns an anonymized context payload.
 2. The app sends it to `POST /offers/generate`.
-3. The backend scores seeded merchants from Postgres and creates a typed GenUI
-   JSON offer.
-4. The app displays the returned payload.
-5. Accepting the offer creates a redemption token.
+3. The backend returns seeded merchants from Postgres.
+4. The app ranks merchants locally from device context.
+5. Offer generation/redemption is currently paused while pipeline foundations are stabilized.
 
 ## DigitalOcean
 

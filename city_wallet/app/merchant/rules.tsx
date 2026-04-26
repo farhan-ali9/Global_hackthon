@@ -2,31 +2,32 @@ import { Link, type Href } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/src/components/Screen";
-import { demoRule } from "@/src/data/mockData";
+import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
 import { color, fontFamily, radii, shadow } from "@/src/theme/tokens";
 
 export default function MerchantRulesScreen() {
+  const { recommendation } = useUserContextLoop();
   return (
     <Screen appBarTitle="Rules">
       <View>
         <Text style={styles.eyebrow}>Merchant rules</Text>
         <Text style={styles.title}>Campaign guardrails</Text>
-        <Text style={styles.subtitle}>Mock rule interface for the generative engine</Text>
+        <Text style={styles.subtitle}>Read-only until generation is enabled</Text>
       </View>
 
       <View style={styles.panel}>
         <Text style={styles.label}>Goal</Text>
-        <Text style={styles.value}>{demoRule.goal}</Text>
+        <Text style={styles.value}>Protect merchant margin and keep relevance high.</Text>
       </View>
 
       <View style={styles.panel}>
         <Text style={styles.label}>Maximum discount</Text>
-        <Text style={styles.value}>{demoRule.maxDiscountPercent}%</Text>
+        <Text style={styles.value}>Configured per merchant in backend seed data.</Text>
       </View>
 
       <View style={styles.panel}>
-        <Text style={styles.label}>Quiet hours</Text>
-        <Text style={styles.value}>{demoRule.quietHours}</Text>
+        <Text style={styles.label}>Selected merchant</Text>
+        <Text style={styles.value}>{recommendation?.merchantId ?? "none yet"}</Text>
       </View>
 
       <Text style={styles.note}>

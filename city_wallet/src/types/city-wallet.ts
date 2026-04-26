@@ -116,6 +116,7 @@ export type OnboardingAnswer = {
 
 export type UserProfile = {
   id: string;
+  displayName: string;
   onboardingAnswers: OnboardingAnswer[];
   completedAtIso: string;
   updatedAtIso: string;

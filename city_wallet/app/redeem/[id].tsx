@@ -2,15 +2,16 @@ import { Link, type Href } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/src/components/Screen";
-import { demoMerchant, demoRedemption } from "@/src/data/mockData";
+import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
 import { color, fontFamily, radii, shadow } from "@/src/theme/tokens";
 
 export default function RedemptionScreen() {
+  const { recommendation } = useUserContextLoop();
   return (
     <Screen appBarTitle="Redeem">
       <View>
         <Text style={styles.eyebrow}>Redemption</Text>
-        <Text style={styles.title}>Show this token at {demoMerchant.name}</Text>
+        <Text style={styles.title}>Redemption flow paused</Text>
       </View>
 
       <View style={styles.qrPlaceholder}>
@@ -19,10 +20,10 @@ export default function RedemptionScreen() {
 
       <View style={styles.tokenBox}>
         <Text style={styles.tokenLabel}>Token</Text>
-        <Text style={styles.token}>{demoRedemption.token}</Text>
+        <Text style={styles.token}>PENDING</Text>
         <Text style={styles.body}>
-          Placeholder for QR/token validation. Backend can connect this to Firestore
-          redemption status later.
+          Coupon generation is intentionally disabled. Once re-enabled, this screen
+          will display a real token for {recommendation?.merchantId ?? "the recommended merchant"}.
         </Text>
       </View>
 
