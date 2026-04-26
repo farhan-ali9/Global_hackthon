@@ -1,8 +1,8 @@
 # City Wallet Backend
 
 Small TypeScript API for the City Wallet demo. It exposes a list of merchants
-in a broad area and generates a per-merchant coupon by calling an LLM
-(OpenRouter) under each merchant's markdown rules. No user data is persisted.
+in a broad area and generates a per-merchant coupon by calling Gemini under
+each merchant's markdown rules. No user data is persisted.
 
 ## Setup
 
@@ -52,8 +52,8 @@ Useful flags:
 - `DATABASE_URL` — Postgres connection string.
 - `PORT` — API port. DigitalOcean App Platform provides this at runtime.
 - `CORS_ORIGIN` — Allowed origin, or `*` for local hackathon development.
-- `OPENROUTER_API_KEY` — required. OpenRouter API key for coupon generation.
-- `OPENROUTER_MODEL` — model slug. Defaults to `openrouter/free`.
+- `GEMINI_API_KEY` — required for coupon generation.
+- `GEMINI_MODEL` — model slug. Defaults to `gemini-1.5-flash`.
 
 ## Endpoints
 
@@ -97,9 +97,9 @@ Body:
 
 `context` is a free-form JSON object the device sends. `userIntent` is the next
 intent chosen by the local device model, and `merchantId` is the merchant chosen
-by that same local model. The server forwards those values to OpenRouter along
-with the merchant and authoritative markdown rules loaded from backend
-configuration for that merchant. Response:
+by that same local model. The server forwards those values to Gemini along with
+the merchant and authoritative markdown rules loaded from backend configuration
+for that merchant. Response:
 
 ```json
 {
@@ -132,5 +132,5 @@ The coupon is not persisted — generation is stateless.
 The server listens on `process.env.PORT` and exposes `/health` for App Platform
 health checks. For deployment, point `DATABASE_URL` at DigitalOcean Managed
 Postgres and use `npm run start:migrate` or the included Dockerfile command so
-Prisma migrations run before the API starts. Set `OPENROUTER_API_KEY` as a
-secret env var in App Platform.
+Prisma migrations run before the API starts. Set `GEMINI_API_KEY` as a secret
+env var in App Platform.

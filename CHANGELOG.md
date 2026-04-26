@@ -23,6 +23,10 @@
 - Kept coupon generation inside the 10-second context loop and stored the
   generated coupon only in frontend in-memory state (RAM) for rendering on the
   Coupons tab, with no coupon persistence in any database.
+- Wired the Profile tab to read display name, city, avatar color, and member
+  since year from SQLite-backed profile storage instead of hardcoded defaults.
+- Removed OpenRouter from coupon generation and switched backend coupon
+  generation to Gemini-only using `GEMINI_API_KEY` and `GEMINI_MODEL`.
 - Added a local merchant recommender adapter for React Native AI/GGUF model
   integration and wired the app root to select a merchant locally before coupon
   generation.

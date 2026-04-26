@@ -13,10 +13,10 @@ export type LlmCouponGeneratorConfig = {
   baseUrl?: string;
 };
 
-const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
+const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const COUPON_TTL_MS = 15 * 60 * 1000;
 const LOG_PREFIX = "[coupon-generator]";
-const OPENROUTER_REQUEST_TIMEOUT_MS = 20_000;
+const GEMINI_REQUEST_TIMEOUT_MS = 20_000;
 
 const SYSTEM_PROMPT = `You generate a single local coupon as JSON.
 
@@ -48,23 +48,17 @@ export function createLlmCouponGenerator(
   prisma: PrismaClient,
   config: LlmCouponGeneratorConfig,
 ): LlmCouponGenerator {
-  const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
+  const geminiBaseUrl = (config.baseUrl ?? DEFAULT_GEMINI_BASE_URL).replace(/\/$/, "");
 
   return {
     async generate({ merchantId, context, userIntent }) {
       if (!config.apiKey) {
-        console.error(`${LOG_PREFIX} missing OPENROUTER_API_KEY`, {
-          merchantId,
-          model: config.model,
-        });
-        throw httpError(
-          503,
-          "Coupon generation is not configured: OPENROUTER_API_KEY is missing",
-        );
+        throw missingGeminiConfigError(merchantId, config.model);
       }
 
       console.info(`${LOG_PREFIX} starting coupon generation`, {
         merchantId,
+        provider: "gemini",
         model: config.model,
         userIntent,
         contextKeys: Object.keys(context),
@@ -102,8 +96,8 @@ export function createLlmCouponGenerator(
         rules,
       };
 
-      const payload = await callOpenRouter({
-        baseUrl,
+      const payload = await callGemini({
+        baseUrl: geminiBaseUrl,
         apiKey: config.apiKey,
         model: config.model,
         system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${configuredMerchant.rules}`,
@@ -179,7 +173,7 @@ function buildUserMessage(
     .join("\n");
 }
 
-type OpenRouterArgs = {
+type GeminiArgs = {
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -188,36 +182,44 @@ type OpenRouterArgs = {
   merchantId: string;
 };
 
-async function callOpenRouter(args: OpenRouterArgs): Promise<LlmCouponPayload> {
-  console.info(`${LOG_PREFIX} calling OpenRouter`, {
+async function callGemini(args: GeminiArgs): Promise<LlmCouponPayload> {
+  console.info(`${LOG_PREFIX} calling Gemini`, {
     merchantId: args.merchantId,
     model: args.model,
     baseUrl: args.baseUrl,
   });
-
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), OPENROUTER_REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), GEMINI_REQUEST_TIMEOUT_MS);
   let response: Response;
   try {
-    response = await fetch(`${args.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${args.apiKey}`,
+    response = await fetch(
+      `${args.baseUrl}/models/${encodeURIComponent(args.model)}:generateContent?key=${encodeURIComponent(args.apiKey)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: args.system }],
+          },
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: args.user }],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1,
+          },
+        }),
+        signal: controller.signal,
       },
-      body: JSON.stringify({
-        model: args.model,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: args.system },
-          { role: "user", content: args.user },
-        ],
-      }),
-      signal: controller.signal,
-    });
+    );
   } catch (error) {
     const isTimeout = error instanceof Error && error.name === "AbortError";
-    console.error(`${LOG_PREFIX} OpenRouter unreachable`, {
+    console.error(`${LOG_PREFIX} Gemini unreachable`, {
       merchantId: args.merchantId,
       model: args.model,
       baseUrl: args.baseUrl,
@@ -227,65 +229,74 @@ async function callOpenRouter(args: OpenRouterArgs): Promise<LlmCouponPayload> {
     throw httpError(
       502,
       isTimeout
-        ? `OpenRouter request timed out after ${OPENROUTER_REQUEST_TIMEOUT_MS}ms`
-        : "OpenRouter is unreachable from backend",
+        ? `Gemini request timed out after ${GEMINI_REQUEST_TIMEOUT_MS}ms`
+        : "Gemini is unreachable from backend",
     );
   } finally {
     clearTimeout(timeoutId);
   }
-
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    console.error(`${LOG_PREFIX} OpenRouter request failed`, {
+    console.error(`${LOG_PREFIX} Gemini request failed`, {
       merchantId: args.merchantId,
       model: args.model,
       status: response.status,
       detail: truncate(detail, 1_000),
     });
-    throw httpError(
-      502,
-      `OpenRouter request failed (${response.status}): ${detail.slice(0, 300)}`,
-    );
+    throw httpError(502, `Gemini request failed (${response.status}): ${detail.slice(0, 300)}`);
   }
 
   let json: unknown;
   try {
     json = await response.json();
   } catch (error) {
-    console.error(`${LOG_PREFIX} OpenRouter returned invalid response JSON`, {
+    console.error(`${LOG_PREFIX} Gemini returned invalid response JSON`, {
       merchantId: args.merchantId,
       model: args.model,
       error: error instanceof Error ? error.message : String(error),
     });
-    throw httpError(502, "OpenRouter returned invalid response JSON");
+    throw httpError(502, "Gemini returned invalid response JSON");
   }
 
-  const content = extractMessageContent(json);
+  const content = extractGeminiContent(json);
   if (!content) {
-    console.error(`${LOG_PREFIX} OpenRouter response missing content`, {
+    console.error(`${LOG_PREFIX} Gemini response missing content`, {
       merchantId: args.merchantId,
       model: args.model,
       responsePreview: truncate(stringifyForLog(json), 2_000),
     });
     throw httpError(
       502,
-      "OpenRouter response missing message content; check backend logs for upstream response details",
+      "Gemini response missing content; check backend logs for upstream response details",
     );
   }
 
-  const parsed = extractJsonPayload(content);
+  return parseCouponPayloadFromContent({
+    provider: "Gemini",
+    content,
+    merchantId: args.merchantId,
+    model: args.model,
+  });
+}
+
+function parseCouponPayloadFromContent(args: {
+  provider: "Gemini";
+  content: string;
+  merchantId: string;
+  model: string;
+}) {
+  const parsed = extractJsonPayload(args.content);
   if (parsed === null) {
-    console.error(`${LOG_PREFIX} OpenRouter returned invalid JSON`, {
+    console.error(`${LOG_PREFIX} ${args.provider} returned invalid JSON`, {
       merchantId: args.merchantId,
       model: args.model,
-      contentPreview: truncate(content, 1_000),
+      contentPreview: truncate(args.content, 1_000),
     });
-    throw httpError(502, "OpenRouter returned invalid JSON");
+    throw httpError(502, `${args.provider} returned invalid JSON`);
   }
-
   const result = llmCouponPayloadSchema.safeParse(parsed);
   if (!result.success) {
-    console.error(`${LOG_PREFIX} OpenRouter response schema mismatch`, {
+    console.error(`${LOG_PREFIX} ${args.provider} response schema mismatch`, {
       merchantId: args.merchantId,
       model: args.model,
       issues: result.error.issues,
@@ -293,7 +304,7 @@ async function callOpenRouter(args: OpenRouterArgs): Promise<LlmCouponPayload> {
     });
     throw httpError(
       502,
-      `OpenRouter response did not match coupon schema: ${result.error.issues
+      `${args.provider} response did not match coupon schema: ${result.error.issues
         .map((issue) => issue.message)
         .join("; ")}`,
     );
@@ -320,51 +331,46 @@ function truncate(value: string, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
 }
 
-function extractMessageContent(value: unknown) {
+function extractGeminiContent(value: unknown) {
+  if (typeof value !== "object" || value === null || !("candidates" in value)) {
+    return null;
+  }
+
+  const candidates = (value as { candidates?: unknown }).candidates;
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return null;
+  }
+
+  const firstCandidate = candidates[0];
   if (
-    typeof value !== "object" ||
-    value === null ||
-    !("choices" in value) ||
-    !Array.isArray(value.choices)
+    typeof firstCandidate !== "object" ||
+    firstCandidate === null ||
+    !("content" in firstCandidate)
   ) {
     return null;
   }
 
-  const [choice] = value.choices;
-  if (
-    typeof choice !== "object" ||
-    choice === null ||
-    !("message" in choice) ||
-    typeof choice.message !== "object" ||
-    choice.message === null ||
-    !("content" in choice.message)
-  ) {
+  const content = (firstCandidate as { content?: unknown }).content;
+  if (typeof content !== "object" || content === null || !("parts" in content)) {
     return null;
   }
 
-  const content = choice.message.content;
-  if (typeof content === "string") {
-    return content;
+  const parts = (content as { parts?: unknown }).parts;
+  if (!Array.isArray(parts)) {
+    return null;
   }
-  if (Array.isArray(content)) {
-    const textChunks = content
-      .map((chunk) => {
-        if (
-          typeof chunk === "object" &&
-          chunk !== null &&
-          "type" in chunk &&
-          chunk.type === "text" &&
-          "text" in chunk &&
-          typeof chunk.text === "string"
-        ) {
-          return chunk.text;
-        }
-        return null;
-      })
-      .filter((chunk): chunk is string => chunk !== null);
-    return textChunks.length > 0 ? textChunks.join("\n") : null;
-  }
-  return null;
+
+  const textChunks = parts
+    .map((part) => {
+      if (typeof part === "object" && part !== null && "text" in part) {
+        const text = (part as { text?: unknown }).text;
+        return typeof text === "string" ? text : null;
+      }
+      return null;
+    })
+    .filter((chunk): chunk is string => chunk !== null);
+
+  return textChunks.length > 0 ? textChunks.join("\n") : null;
 }
 
 function extractJsonPayload(content: string) {
@@ -443,4 +449,9 @@ async function recordCouponGeneratedAnalytics(
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+function missingGeminiConfigError(merchantId: string, model: string) {
+  console.error(`${LOG_PREFIX} missing GEMINI_API_KEY`, { merchantId, model });
+  return httpError(503, "Coupon generation is not configured: GEMINI_API_KEY is missing");
 }

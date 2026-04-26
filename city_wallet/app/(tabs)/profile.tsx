@@ -15,6 +15,7 @@ import { cancelAllNotifications } from "@/src/services/notifications";
 import {
   DEFAULT_AVATAR_COLOR,
   getPersonalInfo,
+  getUserProfile,
 } from "@/src/storage/userProfileStorage";
 import { CW, fontFamily } from "@/src/theme/tokens";
 
@@ -40,21 +41,38 @@ export default function ProfileScreen() {
   const router = useRouter();
   const navigation = useNavigation();
 
-  const [displayName,  setDisplayName]  = useState("Sofia Müller");
-  const [displayCity,  setDisplayCity]  = useState("Linz");
+  const [displayName,  setDisplayName]  = useState("City Wallet user");
+  const [displayCity,  setDisplayCity]  = useState("");
+  const [memberSince,  setMemberSince]  = useState("Member");
   const [avatarColor,  setAvatarColor]  = useState(DEFAULT_AVATAR_COLOR);
   const [activeTab,    setActiveTab]    = useState<"saved" | "redeemed">("saved");
 
   /* Reload personal info every time the tab is focused (e.g. after editing) */
   useFocusEffect(
     useCallback(() => {
-      void getPersonalInfo().then((info) => {
-        if (info) {
-          if (info.name) setDisplayName(info.name);
-          if (info.city) setDisplayCity(info.city);
-          setAvatarColor(info.avatarColor);
-        }
-      });
+      let isMounted = true;
+      void Promise.all([getPersonalInfo(), getUserProfile()]).then(
+        ([personalInfo, userProfile]) => {
+          if (!isMounted) return;
+
+          const preferredName =
+            personalInfo?.name.trim() || userProfile?.displayName.trim() || "";
+          setDisplayName(preferredName.length > 0 ? preferredName : "City Wallet user");
+
+          const preferredCity = personalInfo?.city.trim() ?? "";
+          setDisplayCity(preferredCity);
+
+          setAvatarColor(personalInfo?.avatarColor ?? DEFAULT_AVATAR_COLOR);
+          setMemberSince(
+            userProfile?.completedAtIso
+              ? `Member since ${new Date(userProfile.completedAtIso).getFullYear()}`
+              : "Member",
+          );
+        },
+      );
+      return () => {
+        isMounted = false;
+      };
     }, []),
   );
 
@@ -104,7 +122,10 @@ export default function ProfileScreen() {
           </Pressable>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{displayName}</Text>
-            <Text style={styles.profileSub}>{displayCity ? `${displayCity} resident · ` : ""}Member since 2022</Text>
+              <Text style={styles.profileSub}>
+                {displayCity ? `${displayCity} resident · ` : ""}
+                {memberSince}
+              </Text>
           </View>
         </View>
 

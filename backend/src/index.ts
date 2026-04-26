@@ -23,8 +23,8 @@ const port = Number(process.env.PORT ?? 4000);
 const corsOrigin = process.env.CORS_ORIGIN ?? "*";
 
 const couponGenerator = createLlmCouponGenerator(prisma, {
-  apiKey: process.env.OPENROUTER_API_KEY ?? "",
-  model: process.env.OPENROUTER_MODEL ?? "openrouter/free",
+  apiKey: process.env.GEMINI_API_KEY ?? "",
+  model: process.env.GEMINI_MODEL ?? "gemini-1.5-flash",
 });
 
 app.use(
