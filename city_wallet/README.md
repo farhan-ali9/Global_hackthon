@@ -52,7 +52,7 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
 - `src/lib/api.ts` - Backend API client.
 - `src/lib/demoState.ts` - In-memory handoff between demo screens.
 - `src/storage/userProfileStorage.ts` - SQLite-backed local onboarding profile
-  storage.
+  storage, including the display name shown on the home screen.
 - `src/types/city-wallet.ts` - API contracts shared by the mobile app.
 
 ## Context Coupon Loop

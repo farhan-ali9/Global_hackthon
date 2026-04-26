@@ -1,15 +1,38 @@
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MapPreviewCard } from "@/src/components/MapPreviewCard";
 import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
+import { getUserProfile } from "@/src/storage/userProfileStorage";
 import { CW, fontFamily } from "@/src/theme/tokens";
+import type { UserProfile } from "@/src/types/city-wallet";
 
 const POINTS = 1_240;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { merchants, recommendation, context, status, error } = useUserContextLoop();
+  const [storedProfile, setStoredProfile] = useState<UserProfile | null>(null);
+  const profile = storedProfile ?? context?.profile ?? null;
+  const displayName = profile?.displayName || "City Wallet user";
+  const avatarInitial = useMemo(() => getAvatarInitial(displayName), [displayName]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getUserProfile()
+      .then((nextProfile) => {
+        if (isMounted) setStoredProfile(nextProfile);
+      })
+      .catch(() => {
+        if (isMounted) setStoredProfile(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -17,10 +40,10 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Good morning</Text>
-          <Text style={styles.name}>Sofia M.</Text>
+          <Text style={styles.name}>{displayName}</Text>
         </View>
         <View style={styles.avatarCircle}>
-          <Text style={styles.avatarText}>S</Text>
+          <Text style={styles.avatarText}>{avatarInitial}</Text>
         </View>
       </View>
 
@@ -85,6 +108,10 @@ export default function HomeScreen() {
       </ScrollView>
     </View>
   );
+}
+
+function getAvatarInitial(displayName: string) {
+  return displayName.trim().charAt(0).toUpperCase() || "U";
 }
 
 const styles = StyleSheet.create({

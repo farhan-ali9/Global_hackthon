@@ -50,6 +50,13 @@ export function createLlmCouponGenerator(
 
   return {
     async generate({ merchantId, context, userIntent, merchantRules }) {
+      if (!config.apiKey) {
+        throw httpError(
+          503,
+          "Coupon generation is not configured: OPENROUTER_API_KEY is missing",
+        );
+      }
+
       const merchant = await prisma.merchant.findUnique({
         where: { id: merchantId },
       });

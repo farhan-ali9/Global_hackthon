@@ -16,6 +16,7 @@ import type {
 } from "@/src/types/city-wallet";
 
 import {
+  buildLocalRankingSignals,
   buildLocalModelPrompt,
   setLocalMerchantModelClient,
   type LocalMerchantModelClient,
@@ -93,6 +94,7 @@ function createReactNativeAiMerchantModelClient(): LocalMerchantModelClient {
         requestId,
         modelId,
         merchantCount: request.merchants.length,
+        rankingSignalCount: buildLocalRankingSignals(request).length,
       });
       logModelPipeline("prepare_start", { requestId, modelId });
       const model = await getPreparedModel(modelId);

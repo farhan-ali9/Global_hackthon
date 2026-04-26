@@ -197,13 +197,15 @@ export default function OnboardingQuestionnaire() {
     if (isLast) {
       setIsSaving(true);
       try {
-        await saveUserProfile(
-          QUESTIONS.map((question) => {
+        const displayName = name.trim();
+        await saveUserProfile({
+          displayName,
+          answers: QUESTIONS.map((question) => {
             if (question.type === "text") {
               return {
                 questionId: question.id,
                 questionTitle: question.title,
-                selectedOptions: [{ id: question.id, label: name.trim() }],
+                selectedOptions: [{ id: question.id, label: displayName }],
               };
             }
             return {
@@ -218,7 +220,7 @@ export default function OnboardingQuestionnaire() {
               }),
             };
           }),
-        );
+        });
         router.replace("/(tabs)" as Href);
       } finally {
         setIsSaving(false);
@@ -299,7 +301,7 @@ export default function OnboardingQuestionnaire() {
           <View style={styles.nameInputWrap}>
             <TextInput
               style={styles.nameInput}
-              placeholder="e.g. Sofia"
+              placeholder="e.g. Alex"
               placeholderTextColor={CW.soft}
               value={name}
               onChangeText={setName}

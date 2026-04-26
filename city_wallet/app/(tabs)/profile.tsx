@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { getUserProfile } from "@/src/storage/userProfileStorage";
 import {
   cancelAllNotifications,
   registerForPushNotifications,
@@ -20,6 +21,7 @@ import {
   sendDemoCouponNotification,
 } from "@/src/services/notifications";
 import { CW, fontFamily } from "@/src/theme/tokens";
+import type { UserProfile } from "@/src/types/city-wallet";
 
 const STATS = [
   { l: "City Score", v: "94" },
@@ -42,6 +44,9 @@ export default function ProfileScreen() {
   const [tokenText, setTokenText]         = useState<string | null>(null);
   const [registering, setRegistering]     = useState(false);
   const [sending, setSending]             = useState(false);
+  const [profile, setProfile]             = useState<UserProfile | null>(null);
+  const displayName = profile?.displayName || "City Wallet user";
+  const avatarInitial = useMemo(() => getAvatarInitial(displayName), [displayName]);
 
   /* Try to auto-register on mount (permission may already be granted) */
   useEffect(() => {
@@ -51,6 +56,22 @@ export default function ProfileScreen() {
         setTokenText(r.token ?? null);
       }
     });
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getUserProfile()
+      .then((nextProfile) => {
+        if (isMounted) setProfile(nextProfile);
+      })
+      .catch(() => {
+        if (isMounted) setProfile(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   async function handleNotifToggle(value: boolean) {
@@ -128,10 +149,10 @@ export default function ProfileScreen() {
       <View style={styles.profileCard}>
         <View style={styles.profileRow}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>S</Text>
+            <Text style={styles.avatarText}>{avatarInitial}</Text>
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Sofia Müller</Text>
+            <Text style={styles.profileName}>{displayName}</Text>
             <Text style={styles.profileSub}>Linz resident · Member since 2022</Text>
           </View>
         </View>
@@ -265,6 +286,10 @@ export default function ProfileScreen() {
       </ScrollView>
     </View>
   );
+}
+
+function getAvatarInitial(displayName: string) {
+  return displayName.trim().charAt(0).toUpperCase() || "U";
 }
 
 const styles = StyleSheet.create({
