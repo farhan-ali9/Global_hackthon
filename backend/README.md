@@ -53,7 +53,7 @@ Useful flags:
 - `PORT` — API port. DigitalOcean App Platform provides this at runtime.
 - `CORS_ORIGIN` — Allowed origin, or `*` for local hackathon development.
 - `OPENROUTER_API_KEY` — required. OpenRouter API key for coupon generation.
-- `OPENROUTER_MODEL` — model slug. Defaults to `anthropic/claude-haiku-4-5`.
+- `OPENROUTER_MODEL` — model slug. Defaults to `openrouter/free`.
 
 ## Endpoints
 
@@ -90,24 +90,40 @@ Body:
 ```json
 {
   "merchantId": "merchant-cafe-traxlmayr",
-  "context": { "weather": "rain", "intent": "want_coffee", "timeOfDay": "morning" }
+  "userIntent": "want_coffee",
+  "merchantRules": "Optional markdown rules supplied by the client for this request.",
+  "context": { "weather": "rain", "timeOfDay": "morning" }
 }
 ```
 
-`context` is a free-form JSON object the device sends — the server forwards it
-to the LLM as the user-side anonymised context. The server loads the
-merchant's markdown rules and includes them verbatim in the system prompt as
-hard constraints (max discount, tone, restrictions). Response:
+`context` is a free-form JSON object the device sends. `userIntent` is the next
+intent chosen by the local device model, and `merchantId` is the merchant chosen
+by that same local model. The server forwards those values to OpenRouter along
+with the merchant and authoritative markdown rules. If `merchantRules` is
+provided, it is used for this request; otherwise the server uses the rules stored
+for the merchant. Response:
 
 ```json
 {
-  "merchantId": "merchant-cafe-mueller",
+  "merchantId": "merchant-cafe-traxlmayr",
+  "merchant": {
+    "id": "merchant-cafe-traxlmayr",
+    "description": "Cafe Traxlmayr — classic Linz coffee house near the Landstrasse...",
+    "cityId": "linz-demo",
+    "coordinates": { "latitude": 48.3069, "longitude": 14.2868 }
+  },
   "headline": "Rainy-day pick-me-up",
   "body": "Step in for a warm single-origin espresso — 15% off until 14:00.",
+  "saving": {
+    "type": "percentage",
+    "value": 15,
+    "displayText": "15% off"
+  },
   "discountPercent": 15,
   "ctaLabel": "Redeem now",
   "explanationTags": ["rain", "morning", "quiet-hours"],
-  "expiresAt": "2026-04-25T11:00:00.000Z"
+  "expiresAt": "2026-04-25T11:00:00.000Z",
+  "userIntent": "want_coffee"
 }
 ```
 

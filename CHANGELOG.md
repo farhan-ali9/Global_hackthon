@@ -5,6 +5,8 @@
 ### Frontend app-wide context coupon loop
 - Added SQLite-backed onboarding profile persistence on the client and included
   the stored profile in the local merchant-selection context.
+- Extended backend coupon generation to accept local-model user intent and
+  return merchant details plus percentage- or amount-based saving information.
 - Added a City Wallet context engine that refreshes user context every 10
   seconds with coordinates, current time, timezone, weather placeholder, intent
   labels, and demand tags.

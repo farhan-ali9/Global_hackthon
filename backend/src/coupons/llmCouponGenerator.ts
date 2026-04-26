@@ -28,7 +28,16 @@ extra keys, no prose, and no markdown fences:
 {
   "headline": string,            // <= 60 chars, the coupon title
   "body": string,                // 1-2 sentences explaining the offer
-  "discountPercent": integer,    // 0-100, capped by merchant rules
+  "saving": {                    // choose the format allowed by merchant rules
+    "type": "percentage",
+    "value": number,             // 0-100, capped by merchant rules
+    "displayText": string        // e.g. "15% off"
+  } | {
+    "type": "amount",
+    "amount": number,            // non-negative, capped by merchant rules
+    "currency": string,          // ISO 4217, e.g. "EUR"
+    "displayText": string        // e.g. "5 EUR off"
+  },
   "ctaLabel": string,            // <= 24 chars, e.g. "Redeem now"
   "explanationTags": string[]    // 2-5 short tags justifying the offer
 }`;
@@ -40,13 +49,7 @@ export function createLlmCouponGenerator(
   const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
 
   return {
-    async generate({ merchantId, context }) {
-      if (!config.apiKey) {
-        throw httpError(
-          503,
-          "Coupon generation is not configured: OPENROUTER_API_KEY is missing",
-        );
-      }
+    async generate({ merchantId, context, userIntent, merchantRules }) {
       const merchant = await prisma.merchant.findUnique({
         where: { id: merchantId },
       });
@@ -63,27 +66,34 @@ export function createLlmCouponGenerator(
         baseUrl,
         apiKey: config.apiKey,
         model: config.model,
-        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${rules}`,
-        user: buildUserMessage(
-          {
-            id: merchant.id,
-            cityId: merchant.cityId,
-            description,
-            latitude,
-            longitude,
-          },
-          context,
-        ),
+        system: `${SYSTEM_PROMPT}\n\n--- Merchant rules (authoritative) ---\n${
+          merchantRules ?? merchant.rules
+        }`,
+        user: buildUserMessage(merchant, context, userIntent),
       });
 
       return {
         merchantId: merchant.id,
+        merchant: {
+          id: merchant.id,
+          description: merchant.description,
+          cityId: merchant.cityId,
+          coordinates: {
+            latitude: merchant.latitude,
+            longitude: merchant.longitude,
+          },
+        },
         headline: payload.headline,
         body: payload.body,
-        discountPercent: payload.discountPercent,
+        saving: payload.saving,
+        discountPercent:
+          payload.saving.type === "percentage"
+            ? Math.round(payload.saving.value)
+            : undefined,
         ctaLabel: payload.ctaLabel,
         explanationTags: payload.explanationTags,
         expiresAt: new Date(Date.now() + COUPON_TTL_MS).toISOString(),
+        userIntent,
       };
     },
   };
@@ -98,17 +108,21 @@ function buildUserMessage(
     longitude: number;
   },
   context: Record<string, unknown>,
+  userIntent?: string,
 ) {
   return [
     `Merchant: ${merchant.description}`,
     `City: ${merchant.cityId}`,
     `Coordinates: ${merchant.latitude}, ${merchant.longitude}`,
+    userIntent ? `Next user intent from local model: ${userIntent}` : null,
     "",
     "User context (anonymised, device-supplied):",
     JSON.stringify(context, null, 2),
     "",
     "Generate the coupon JSON now.",
-  ].join("\n");
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }
 
 type OpenRouterArgs = {

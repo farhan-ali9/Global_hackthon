@@ -16,7 +16,7 @@ const corsOrigin = process.env.CORS_ORIGIN ?? "*";
 
 const couponGenerator = createLlmCouponGenerator(prisma, {
   apiKey: process.env.OPENROUTER_API_KEY ?? "",
-  model: process.env.OPENROUTER_MODEL ?? "anthropic/claude-haiku-4-5",
+  model: process.env.OPENROUTER_MODEL ?? "openrouter/free",
 });
 
 app.use(
