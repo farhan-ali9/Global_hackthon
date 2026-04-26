@@ -6,7 +6,9 @@ import type {
   MerchantSummary,
   RedemptionResponse,
 } from "@/src/types/city-wallet";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
+
 export type WeatherBucket = "clear" | "cloudy" | "rain" | "cold" | "hot";
 
 export type WeatherContextResponse = {
@@ -61,9 +63,9 @@ export async function getWeatherFromGps(
     },
   };
 }
-const apiBaseUrl =
-  process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:4000";
+const DEFAULT_API_PORT = "4000";
+const apiConfig = resolveApiConfig();
+const apiBaseUrl = apiConfig.baseUrl;
 
 export async function generateOffer(
   context: AnonymizedContextPayload,
@@ -114,6 +116,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const method = options.method ?? "GET";
   const requestUrl = `${apiBaseUrl}${path}`;
   let response: Response;
+  logApiRequest({ method, path, requestUrl });
   try {
     response = await fetch(requestUrl, {
       ...options,
@@ -146,6 +149,92 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+function resolveApiConfig() {
+  const configuredBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (configuredBaseUrl) {
+    return {
+      baseUrl: removeTrailingSlash(configuredBaseUrl),
+      source: "env",
+    };
+  }
+
+  const metroHost = getMetroHost();
+  if (metroHost && !isLoopbackHost(metroHost)) {
+    return {
+      baseUrl: `http://${metroHost}:${DEFAULT_API_PORT}`,
+      source: "metro_host",
+    };
+  }
+
+  if (Platform.OS === "android") {
+    return {
+      baseUrl: `http://10.0.2.2:${DEFAULT_API_PORT}`,
+      source: "android_emulator_default",
+    };
+  }
+
+  return {
+    baseUrl: `http://localhost:${DEFAULT_API_PORT}`,
+    source: Platform.OS === "web" ? "web_default" : "ios_simulator_default",
+  };
+}
+
+function removeTrailingSlash(value: string) {
+  return value.replace(/\/$/, "");
+}
+
+function getMetroHost() {
+  const hostUri = getExpoHostUri();
+  if (!hostUri) return null;
+
+  const candidate = hostUri.includes("://") ? hostUri : `http://${hostUri}`;
+  try {
+    return new URL(candidate).hostname || null;
+  } catch {
+    return hostUri.split(":")[0] || null;
+  }
+}
+
+function getExpoHostUri() {
+  const expoConfig = Constants.expoConfig as { hostUri?: string } | null;
+  const manifest2 = Constants.manifest2 as
+    | { extra?: { expoClient?: { hostUri?: string } } }
+    | null
+    | undefined;
+  const manifest = Constants.manifest as
+    | { debuggerHost?: string; hostUri?: string }
+    | null
+    | undefined;
+
+  return (
+    expoConfig?.hostUri ??
+    manifest2?.extra?.expoClient?.hostUri ??
+    manifest?.hostUri ??
+    manifest?.debuggerHost ??
+    null
+  );
+}
+
+function isLoopbackHost(host: string) {
+  return host === "localhost" || host === "127.0.0.1" || host === "::1";
+}
+
+function logApiRequest(args: {
+  method: string;
+  path: string;
+  requestUrl: string;
+}) {
+  console.info("[api] request", {
+    method: args.method,
+    path: args.path,
+    requestUrl: args.requestUrl,
+    apiBaseUrl,
+    apiBaseUrlSource: apiConfig.source,
+    platform: Platform.OS,
+    appOwnership: Constants.appOwnership ?? "unknown",
+  });
 }
 
 function buildNetworkFailureMessage(args: {

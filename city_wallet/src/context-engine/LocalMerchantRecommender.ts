@@ -34,7 +34,11 @@ export async function recommendMerchant(
   }
 
   if (localMerchantModelClient === null) {
-    return getFallbackRecommendation(request);
+    const fallbackRecommendation = getFallbackRecommendation(request);
+    logRecommendationPath("fallback", fallbackRecommendation, {
+      reason: "native_client_unregistered",
+    });
+    return fallbackRecommendation;
   }
   const modelClient = localMerchantModelClient;
 
@@ -44,11 +48,20 @@ export async function recommendMerchant(
       LOCAL_MODEL_OPERATION_TIMEOUT_MS,
     );
 
-    return validateRecommendation(request, recommendation);
+    const validatedRecommendation = validateRecommendation(request, recommendation);
+    logRecommendationPath(validatedRecommendation.modelSource ?? "native_gguf", validatedRecommendation);
+    return validatedRecommendation;
   } catch (error) {
     console.warn("Local merchant model failed; using fallback.", error);
 
-    return getFallbackRecommendation(request, getFallbackReasoningTags(error));
+    const fallbackRecommendation = getFallbackRecommendation(
+      request,
+      getFallbackReasoningTags(error),
+    );
+    logRecommendationPath("fallback", fallbackRecommendation, {
+      reason: "native_client_error",
+    });
+    return fallbackRecommendation;
   }
 }
 
@@ -140,6 +153,20 @@ function getFallbackRecommendation(
     rankedMerchantIds,
     modelSource: "fallback",
   };
+}
+
+function logRecommendationPath(
+  modelSource: LocalRecommendationResponse["modelSource"],
+  recommendation: LocalRecommendationResponse,
+  extra: Record<string, unknown> = {},
+) {
+  console.info("[merchant-recommender] recommendation selected", {
+    modelSource,
+    merchantId: recommendation.merchantId,
+    confidence: recommendation.confidence ?? null,
+    reasoningTags: recommendation.reasoningTags ?? [],
+    ...extra,
+  });
 }
 
 function validateRecommendation(

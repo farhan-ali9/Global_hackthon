@@ -1,8 +1,8 @@
 # City Wallet App
 
 Expo Go-compatible mobile app for the City Wallet demo. The app collects
-device-side context and ranks nearby merchants locally. Coupon generation is
-currently paused while the pre-generation pipeline is stabilized.
+device-side context, ranks nearby merchants, and calls the backend to generate
+Groq-powered coupons.
 
 ## Running Locally
 
@@ -26,9 +26,13 @@ Default:
 ```bash
 EXPO_PUBLIC_API_BASE_URL=http://localhost:4000
 EXPO_PUBLIC_ON_DEVICE_MODEL_ID=Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf
+EXPO_PUBLIC_ENABLE_LOCAL_MODEL=false
 ```
 
-For Expo Go on a physical device, use your computer's LAN IP:
+If `EXPO_PUBLIC_API_BASE_URL` is omitted, the app attempts to derive the backend
+host from the Expo/Metro host in development, then falls back to simulator and
+emulator defaults. For Expo Go on a physical device, explicitly using your
+computer's LAN IP is still the most predictable setup:
 
 ```bash
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:4000
@@ -67,9 +71,11 @@ every 10 seconds, the provider:
    user's broad city.
 3. Calls `recommendMerchant({ context, merchants })` in
    `LocalMerchantRecommender.ts`. Native builds register the React Native
-   AI/GGUF implementation at app startup; web and test builds use the
-   deterministic nearest-merchant fallback.
-4. (Temporarily disabled) Coupon generation is intentionally skipped.
+   AI/GGUF implementation at app startup when
+   `EXPO_PUBLIC_ENABLE_LOCAL_MODEL=true`; Expo Go, web, and unconfigured dev
+   builds use the deterministic nearest-merchant fallback.
+4. Calls `POST /coupons/generate` with `{ merchantId, userIntent, context }` so
+   the backend can generate a typed coupon through Groq.
 
 ## How to Work With It
 
@@ -79,8 +85,9 @@ every 10 seconds, the provider:
   or API-backed weather source.
 - Add new supported city bounding boxes in `ContextProvider.ts` when the backend
   is seeded with additional `cityId` values.
-- Native AI work requires a custom Expo dev build or prebuild because Expo Go
-  cannot load the llama.rn native module.
+- Native AI work requires a custom Expo dev build or prebuild with
+  `EXPO_PUBLIC_ENABLE_LOCAL_MODEL=true` because Expo Go cannot load the
+  llama.rn native module.
 - Backend generation returns typed coupon JSON, not remote executable UI code.
 
 ## Checks
@@ -92,5 +99,5 @@ npx tsc --noEmit
 
 ## Current Scope
 
-This scaffold does not yet implement real context signals, push notifications,
-QR rendering, or React Native AI native modules.
+This scaffold does not yet implement real context signals or production push
+notification delivery.
