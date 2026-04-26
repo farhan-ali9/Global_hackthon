@@ -45,16 +45,16 @@ export default function Onboarding() {
           {/* Hero illustration */}
           <View style={styles.heroCard}>
             <View style={styles.heroCardInner}>
-              <Text style={styles.heroCardLabel}>CITY BALANCE</Text>
-              <Text style={styles.heroCardAmount}>€ 284.50</Text>
+              <Text style={styles.heroCardLabel}>Your Points</Text>
+              <Text style={styles.heroCardAmount}>1 240 pts</Text>
               <View style={styles.heroCardRow}>
                 <View style={styles.heroSubCard}>
-                  <Text style={styles.heroSubLabel}>Transit</Text>
-                  <Text style={styles.heroSubValue}>€ 40 left</Text>
+                  <Text style={styles.heroSubLabel}>Saved</Text>
+                  <Text style={styles.heroSubValue}>€38</Text>
                 </View>
                 <View style={styles.heroSubCard}>
-                  <Text style={styles.heroSubLabel}>City Tax</Text>
-                  <Text style={styles.heroSubValue}>Paid ✓</Text>
+                  <Text style={styles.heroSubLabel}>Redeemed coupons</Text>
+                  <Text style={styles.heroSubValue}>12</Text>
                 </View>
               </View>
             </View>
@@ -72,8 +72,7 @@ export default function Onboarding() {
             <Text style={styles.titleMain}>{"\n"}in your pocket</Text>
           </View>
           <Text style={styles.subtitle}>
-            Manage transit, pay city services, and access your civic ID — all
-            from one wallet.
+            The right deals, right where you are — tailored to how you live.
           </Text>
 
           {/* Email input row */}
