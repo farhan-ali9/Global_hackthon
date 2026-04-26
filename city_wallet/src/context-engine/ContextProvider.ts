@@ -1,5 +1,5 @@
 import * as Location from "expo-location";
-
+import { getWeatherFromGps } from "@/src/lib/api";
 import type {
   IntentLabel,
   TimeOfDay,
@@ -12,6 +12,7 @@ export type ContextProvider = {
   getUserContext: () => Promise<UserContext>;
 };
 
+let cachedWeather: WeatherSituation | null = null;
 const DEFAULT_COORDINATES = {
   latitude: 48.7784,
   longitude: 9.1801,
@@ -25,7 +26,33 @@ export const deviceContextProvider: ContextProvider = {
     const now = new Date();
     const location = await getCurrentLocation();
     const coordinates = location?.coords ?? DEFAULT_COORDINATES;
-    const weather = getPlaceholderWeather(now);
+  
+    let weather: WeatherSituation;
+
+    if (cachedWeather) {
+      weather = cachedWeather;
+    } else {
+      const weatherResponse = await getWeatherFromGps(
+        coordinates.latitude,
+        coordinates.longitude,
+      );
+
+      weather = {
+        bucket: weatherResponse.weather.weatherBucket,
+        label: weatherResponse.weather.description,
+        temperatureCelsius: weatherResponse.weather.temperature,
+        precipitationProbability: weatherResponse.weather.condition
+          .toLowerCase()
+          .includes("rain")
+          ? 0.8
+          : 0.1,
+        source: "weather_api",
+      };
+
+      cachedWeather = weather;
+    }
+  console.log("GPS:", coordinates);
+console.log("WEATHER:", weather);
     const timeOfDay = getTimeOfDay(now);
     const dayOfWeek = now.toLocaleDateString("en-US", { weekday: "long" });
 
