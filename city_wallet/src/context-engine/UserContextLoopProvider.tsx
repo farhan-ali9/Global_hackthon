@@ -9,6 +9,9 @@ import {
   type PropsWithChildren,
 } from "react";
 
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
+
 import { generateCoupon, getMerchants } from "@/src/lib/api";
 import type {
   GeneratedCouponResponse,
@@ -50,6 +53,8 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
   const [error, setError] = useState<string | null>(null);
   const isRefreshingRef = useRef(false);
   const isMountedRef = useRef(false);
+  // Track the last coupon we notified about to avoid re-firing on every cached hit
+  const lastNotifiedCouponKeyRef = useRef<string | null>(null);
 
   const refreshNow = useCallback(async () => {
     if (isRefreshingRef.current) return;
@@ -110,6 +115,29 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
       setRecommendation(nextRecommendation);
       setCoupon(nextCoupon);
       setCouponError(nextCouponError);
+
+      // Fire a local notification only when a genuinely new coupon arrives
+      // (different merchant or different expiry = new generation, not a cache hit)
+      if (nextCoupon) {
+        const couponKey = `${nextCoupon.merchantId}::${nextCoupon.expiresAt}`;
+        if (couponKey !== lastNotifiedCouponKeyRef.current) {
+          lastNotifiedCouponKeyRef.current = couponKey;
+          try {
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: nextCoupon.headline,
+                body: nextCoupon.body,
+                data: { type: "new_coupon", merchantId: nextCoupon.merchantId },
+                ...(Platform.OS === "android" && { color: "#2d6a4f", priority: "high" }),
+              },
+              trigger: null,
+            });
+          } catch {
+            // Non-fatal — notification permission may not be granted yet
+          }
+        }
+      }
+
       setLastUpdatedAt(new Date().toISOString());
       setStatus("ready");
     } catch (refreshError) {
