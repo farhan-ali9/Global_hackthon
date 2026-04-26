@@ -100,7 +100,7 @@ export default function HomeScreen() {
           {error ? (
             <Text style={[styles.emptyText, { color: "#9c2a2a" }]}>{error}</Text>
           ) : (
-            <Text style={styles.emptyText}>Offer generation is intentionally disabled for now.</Text>
+            <Text style={styles.emptyText}>Open the Coupons tab to generate and view your coupon.</Text>
           )}
         </View>
 

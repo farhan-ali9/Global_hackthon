@@ -12,7 +12,8 @@ import MapView, { Callout, Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
-import { MAP_MERCHANTS, USER_LOCATION, type MapMerchant } from "@/src/data/mockData";
+import { USER_LOCATION, type MapMerchant } from "@/src/data/mockData";
+import { getDisplayMapMerchants } from "@/src/lib/mapMerchants";
 import { CW, fontFamily } from "@/src/theme/tokens";
 
 export default function FullMapScreen() {
@@ -20,9 +21,10 @@ export default function FullMapScreen() {
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
   const hasCenteredLiveLocationRef = useRef(false);
-  const { context } = useUserContextLoop();
+  const { context, merchants } = useUserContextLoop();
 
   const [selected, setSelected] = useState<MapMerchant | null>(null);
+  const mapMerchants = useMemo(() => getDisplayMapMerchants(merchants), [merchants]);
   const userCoordinates = context?.coordinates ?? USER_LOCATION;
   const userRegion = useMemo(
     () => ({
@@ -68,7 +70,7 @@ export default function FullMapScreen() {
         </Marker>
 
         {/* Merchant markers */}
-        {MAP_MERCHANTS.map((m) => (
+        {mapMerchants.map((m) => (
           <Marker
             key={m.id}
             coordinate={{ latitude: m.latitude, longitude: m.longitude }}
@@ -105,7 +107,7 @@ export default function FullMapScreen() {
 
         <View style={styles.titleBox}>
           <Text style={styles.title}>Nearby Merchants</Text>
-          <Text style={styles.subtitle}>{MAP_MERCHANTS.length} offers available</Text>
+          <Text style={styles.subtitle}>{mapMerchants.length} merchants nearby</Text>
         </View>
 
         <Pressable

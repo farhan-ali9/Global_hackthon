@@ -1,8 +1,12 @@
 import "dotenv/config";
 
-import { PrismaClient } from "@prisma/client";
+import { createHash } from "node:crypto";
+
+import { PrismaClient, type MerchantCategory } from "@prisma/client";
 
 const prisma = new PrismaClient();
+const DEMO_OWNER_EMAIL = "demo-merchant@citywallet.local";
+const DEMO_OWNER_PASSWORD = "demo-password";
 
 const merchants = [
   {
@@ -164,18 +168,95 @@ const merchants = [
 ];
 
 async function main() {
+  const demoOwner = await prisma.merchantOwner.upsert({
+    where: { email: DEMO_OWNER_EMAIL },
+    create: {
+      email: DEMO_OWNER_EMAIL,
+      passwordHash: hashPassword(DEMO_OWNER_PASSWORD),
+    },
+    update: {},
+  });
+
   await prisma.merchant.deleteMany({
     where: { cityId: "stuttgart-demo" },
   });
 
   for (const merchant of merchants) {
+    const merchantData = {
+      ...merchant,
+      name: getMerchantName(merchant.description),
+      category: getMerchantCategory(merchant.id),
+      ownerId: demoOwner.id,
+    };
     await prisma.merchant.upsert({
       where: { id: merchant.id },
-      create: merchant,
-      update: merchant,
+      create: merchantData,
+      update: merchantData,
+    });
+    await prisma.couponRuleSet.upsert({
+      where: { merchantId: merchant.id },
+      create: buildRuleSetData(merchant.id, merchant.rules),
+      update: buildRuleSetData(merchant.id, merchant.rules),
     });
   }
   console.log(`Seeded ${merchants.length} merchants.`);
+}
+
+function hashPassword(password: string) {
+  return createHash("sha256").update(password).digest("hex");
+}
+
+function getMerchantName(description: string) {
+  return description.split(" — ")[0] ?? description;
+}
+
+function getMerchantCategory(merchantId: string): MerchantCategory {
+  if (merchantId.includes("cafe") || merchantId.includes("eis")) return "CAFE";
+  if (merchantId.includes("bistro") || merchantId.includes("bakery")) return "RESTAURANT";
+  if (merchantId.includes("ars")) return "CULTURE";
+  return "RETAIL";
+}
+
+function buildRuleSetData(merchantId: string, rulesMarkdown: string) {
+  return {
+    merchantId,
+    maxDiscountPercent: getMaxDiscountPercent(rulesMarkdown),
+    allowedWindows: getAllowedWindows(rulesMarkdown),
+    exclusions: getExclusions(rulesMarkdown),
+    tone: getTone(rulesMarkdown),
+    validityMinutes: getValidityMinutes(rulesMarkdown),
+    extraInstructions: "",
+    rulesMarkdown,
+    active: true,
+  };
+}
+
+function getMaxDiscountPercent(rulesMarkdown: string) {
+  const match = rulesMarkdown.match(/Maximum discount:\s*(\d+)%/i);
+  return match ? Number(match[1]) : 15;
+}
+
+function getAllowedWindows(rulesMarkdown: string) {
+  const lines = rulesMarkdown
+    .split("\n")
+    .filter((line) => /only|hours|windows|slots/i.test(line));
+  return lines.length > 0 ? lines : ["Any open business hours"];
+}
+
+function getExclusions(rulesMarkdown: string) {
+  return rulesMarkdown
+    .split("\n")
+    .filter((line) => /never|exclude|no discounts?|not groups/i.test(line));
+}
+
+function getTone(rulesMarkdown: string) {
+  const match = rulesMarkdown.match(/Tone:\s*([^\n]+)/i);
+  return match?.[1]?.trim() ?? "friendly and concise";
+}
+
+function getValidityMinutes(rulesMarkdown: string) {
+  const match = rulesMarkdown.match(/valid for\s*(\d+)\s*minutes/i);
+  return match ? Number(match[1]) : 15;
 }
 
 main()

@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useUserContextLoop } from "@/src/context-engine/UserContextLoopProvider";
-import type { MerchantSummary } from "@/src/types/city-wallet";
+import type { GeneratedCouponResponse, MerchantSummary } from "@/src/types/city-wallet";
 import { CW, fontFamily } from "@/src/theme/tokens";
 
 function formatDistance(m: number) {
@@ -14,11 +14,16 @@ function MerchantCard({
   merchant,
   distanceMeters,
   isRecommended,
+  coupon,
 }: {
   merchant: MerchantSummary;
   distanceMeters: number;
   isRecommended: boolean;
+  coupon: GeneratedCouponResponse | null;
 }) {
+  const isCouponForMerchant = coupon?.merchantId === merchant.id;
+  const expiresAtLabel = coupon ? formatExpiresAt(coupon.expiresAt) : null;
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -38,7 +43,20 @@ function MerchantCard({
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.offerDetail}>{merchant.description}</Text>
-        <Text style={styles.metaText}>Offer generation disabled for now.</Text>
+        {isCouponForMerchant && coupon ? (
+          <>
+            <Text style={styles.couponHeadline}>{coupon.headline}</Text>
+            <Text style={styles.metaText}>{coupon.body}</Text>
+            <Text style={styles.savingText}>{coupon.saving.displayText}</Text>
+            <Text style={styles.metaText}>
+              CTA: {coupon.ctaLabel} · Expires {expiresAtLabel}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.metaText}>
+            {isRecommended ? "Generating coupon for this merchant..." : "Waiting for local model pick"}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -46,7 +64,9 @@ function MerchantCard({
 
 export default function CouponsScreen() {
   const insets = useSafeAreaInsets();
-  const { context, merchants, recommendation, status, error } = useUserContextLoop();
+  const { context, merchants, recommendation, coupon, couponError, status, error } =
+    useUserContextLoop();
+
   const merchantsWithDistance = merchants
     .map((merchant) => ({
       merchant,
@@ -64,7 +84,7 @@ export default function CouponsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Merchant Pipeline</Text>
-          <Text style={styles.subtitle}>Context + merchant ranking (no offer generation)</Text>
+          <Text style={styles.subtitle}>Context + merchant ranking (coupon in loop state)</Text>
         </View>
         <View style={styles.countBadge}>
           <Text style={styles.countText}>{merchants.length}</Text>
@@ -79,6 +99,14 @@ export default function CouponsScreen() {
           <Text style={styles.statusTitle}>Loop status: {status}</Text>
           <Text style={styles.statusBody}>City: {context?.cityId ?? "n/a"} · Zone: {context?.zoneId ?? "n/a"}</Text>
           <Text style={styles.statusBody}>Recommended merchant: {recommendation?.merchantId ?? "none yet"}</Text>
+          <Text style={styles.statusBody}>Coupon merchant: {coupon?.merchantId ?? "none yet"}</Text>
+          <Text style={styles.statusBody}>Coupon status: {status === "refreshing" ? "generating" : "ready"}</Text>
+          {coupon ? (
+            <Text style={styles.statusBody}>
+              Saving: {coupon.saving.displayText} · Intent: {coupon.userIntent ?? "n/a"}
+            </Text>
+          ) : null}
+          {couponError ? <Text style={styles.errorText}>{couponError}</Text> : null}
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </View>
         {merchantsWithDistance.map(({ merchant, distanceMeters }) => (
@@ -87,6 +115,7 @@ export default function CouponsScreen() {
             merchant={merchant}
             distanceMeters={distanceMeters}
             isRecommended={recommendation?.merchantId === merchant.id}
+            coupon={coupon}
           />
         ))}
         <View style={{ height: 12 }} />
@@ -175,6 +204,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   offerDetail: { fontSize: 14, fontWeight: "600", color: CW.text, fontFamily: fontFamily.bold },
+  couponHeadline: { fontSize: 15, fontWeight: "700", color: CW.text, fontFamily: fontFamily.bold },
+  savingText: { fontSize: 12, color: CW.text, fontFamily: fontFamily.semibold },
   metaText: { fontSize: 11, color: CW.soft, fontFamily: fontFamily.regular, flex: 1 },
   statusCard: {
     backgroundColor: CW.bg,
@@ -199,4 +230,12 @@ function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: numbe
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) ** 2;
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function formatExpiresAt(expiresAt: string) {
+  const date = new Date(expiresAt);
+  if (Number.isNaN(date.getTime())) {
+    return "soon";
+  }
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }

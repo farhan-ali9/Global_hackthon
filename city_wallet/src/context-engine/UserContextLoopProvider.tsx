@@ -9,14 +9,15 @@ import {
   type PropsWithChildren,
 } from "react";
 
-import { getMerchants } from "@/src/lib/api";
+import { generateCoupon, getMerchants } from "@/src/lib/api";
 import type {
+  GeneratedCouponResponse,
   LocalRecommendationResponse,
   MerchantSummary,
   UserContext,
 } from "@/src/types/city-wallet";
 
-import { deviceContextProvider } from "./ContextProvider";
+import { buildCouponRequestContext, deviceContextProvider } from "./ContextProvider";
 import { recommendMerchant } from "./LocalMerchantRecommender";
 
 const REFRESH_INTERVAL_MS = 10_000;
@@ -28,6 +29,8 @@ type UserContextLoopState = {
   context: UserContext | null;
   merchants: MerchantSummary[];
   recommendation: LocalRecommendationResponse | null;
+  coupon: GeneratedCouponResponse | null;
+  couponError: string | null;
   lastUpdatedAt: string | null;
   error: string | null;
   refreshNow: () => Promise<void>;
@@ -41,6 +44,8 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
   const [merchants, setMerchants] = useState<MerchantSummary[]>([]);
   const [recommendation, setRecommendation] =
     useState<LocalRecommendationResponse | null>(null);
+  const [coupon, setCoupon] = useState<GeneratedCouponResponse | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isRefreshingRef = useRef(false);
@@ -52,6 +57,7 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
     isRefreshingRef.current = true;
     setStatus("refreshing");
     setError(null);
+    setCouponError(null);
 
     try {
       let nextContext: UserContext;
@@ -86,10 +92,24 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
         throw new Error(withCause("Failed to recommend merchant", error));
       }
 
+      let nextCoupon: GeneratedCouponResponse | null = null;
+      let nextCouponError: string | null = null;
+      try {
+        nextCoupon = await generateCoupon({
+          merchantId: nextRecommendation.merchantId,
+          userIntent: nextRecommendation.userIntent,
+          context: buildCouponRequestContext(nextContext),
+        });
+      } catch (couponGenerationError) {
+        nextCouponError = withCause("Failed to generate coupon", couponGenerationError);
+      }
+
       if (!isMountedRef.current) return;
 
       setMerchants(nextMerchants);
       setRecommendation(nextRecommendation);
+      setCoupon(nextCoupon);
+      setCouponError(nextCouponError);
       setLastUpdatedAt(new Date().toISOString());
       setStatus("ready");
     } catch (refreshError) {
@@ -126,6 +146,8 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
       context,
       merchants,
       recommendation,
+      coupon,
+      couponError,
       lastUpdatedAt,
       error,
       refreshNow,
@@ -135,6 +157,8 @@ export function UserContextLoopProvider({ children }: PropsWithChildren) {
       context,
       merchants,
       recommendation,
+      coupon,
+      couponError,
       lastUpdatedAt,
       error,
       refreshNow,

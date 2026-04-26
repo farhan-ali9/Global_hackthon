@@ -9,16 +9,21 @@ selection for City Wallet.
    time, timezone, coordinate-derived city/zone ids, weather, the locally stored
    onboarding profile, and derived intent/demand signals.
 2. `UserContextLoopProvider.tsx` refreshes that context every 10 seconds,
-   fetches merchants for the user's `cityId`, asks the local recommender to pick
-   a merchant, and requests a coupon from the backend.
-3. `LocalMerchantRecommender.ts` is the adapter boundary for local merchant
+   fetches merchants for the user's `cityId`, asks the local recommender to
+   pick a merchant plus generate `userIntent` in a separate local-model prompt,
+   then requests a coupon from the backend with
+   `{ merchantId, userIntent, context }`.
+3. The generated coupon is stored in in-memory React state in the loop provider
+   (RAM only, no persistence/database write), and `app/(tabs)/coupons.tsx`
+   renders it.
+4. `LocalMerchantRecommender.ts` is the adapter boundary for local merchant
    ranking. Native builds register `ReactNativeAiMerchantModelClient.native.ts`,
    which downloads the configured GGUF model on first use and runs it through
    React Native AI/llama.rn. Web and test builds keep the deterministic fallback.
 
 Precise coordinates and the onboarding profile are used for local merchant
 selection. The backend coupon request receives a reduced context payload without
-raw GPS coordinates.
+raw GPS coordinates, plus the local-model user intent and picked merchant id.
 
 `cityId` is resolved from configured coordinate bounds. At the moment, the only
 backend-seeded city is `linz-demo`, so coordinates outside configured bounds

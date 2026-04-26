@@ -17,6 +17,7 @@ import type {
 
 import {
   buildLocalRankingSignals,
+  buildLocalIntentPrompt,
   buildLocalModelPrompt,
   setLocalMerchantModelClient,
   type LocalMerchantModelClient,
@@ -43,6 +44,15 @@ const RESPONSE_SCHEMA: JSONSchema7 = {
   },
 };
 
+const INTENT_RESPONSE_SCHEMA: JSONSchema7 = {
+  type: "object",
+  additionalProperties: false,
+  required: ["userIntent"],
+  properties: {
+    userIntent: { type: "string" },
+  },
+};
+
 type ModelRecommendationPayload = {
   merchantId: string;
   confidence?: unknown;
@@ -50,9 +60,18 @@ type ModelRecommendationPayload = {
   rankedMerchantIds?: unknown;
 };
 
+type ModelIntentPayload = {
+  userIntent: unknown;
+};
+
 const RESPONSE_OUTPUT = AiOutput.object<ModelRecommendationPayload>({
   schema: jsonSchema<ModelRecommendationPayload>(RESPONSE_SCHEMA),
   name: "merchant_recommendation",
+});
+
+const INTENT_OUTPUT = AiOutput.object<ModelIntentPayload>({
+  schema: jsonSchema<ModelIntentPayload>(INTENT_RESPONSE_SCHEMA),
+  name: "user_intent",
 });
 
 let preparedModel: LlamaLanguageModel | null = null;
@@ -142,11 +161,73 @@ function createReactNativeAiMerchantModelClient(): LocalMerchantModelClient {
         );
       }
 
-      const normalized = normalizeModelResponse(recommendation, request, modelId);
+      const intentPrompt = buildLocalIntentPrompt(request, {
+        merchantId: recommendation.merchantId,
+        reasoningTags: normalizeStringArray(recommendation.reasoningTags),
+      });
+      const userIntent = await generateUserIntent(
+        model,
+        intentPrompt,
+        request,
+        modelId,
+        requestId,
+        abortSignal,
+      );
+
+      const normalized = normalizeModelResponse(recommendation, userIntent, request, modelId);
       logModelPipeline("request_success", { requestId, modelId, normalized });
       return normalized;
     },
   };
+}
+
+async function generateUserIntent(
+  model: LlamaLanguageModel,
+  prompt: string,
+  request: LocalRecommendationRequest,
+  modelId: string,
+  requestId: string,
+  abortSignal?: AbortSignal,
+) {
+  let intentPayload: ModelIntentPayload;
+  if (ENABLE_STRUCTURED_OUTPUT) {
+    try {
+      intentPayload = await generateStructuredIntent(
+        model,
+        prompt,
+        modelId,
+        requestId,
+        abortSignal,
+      );
+    } catch (structuredError) {
+      if (isAbortError(structuredError)) {
+        throw structuredError;
+      }
+      intentPayload = await generateTextIntent(
+        model,
+        prompt,
+        request,
+        modelId,
+        requestId,
+        structuredError,
+        abortSignal,
+        "intent_fallback",
+      );
+    }
+  } else {
+    intentPayload = await generateTextIntent(
+      model,
+      prompt,
+      request,
+      modelId,
+      requestId,
+      "structured output disabled for local intent",
+      abortSignal,
+      "intent_text",
+    );
+  }
+
+  return normalizeIntent(intentPayload.userIntent, request);
 }
 
 async function generateStructuredRecommendation(
@@ -173,6 +254,38 @@ async function generateStructuredRecommendation(
       }),
   );
   logModelPipeline("structured_output", { requestId, modelId, output });
+  return output;
+}
+
+async function generateStructuredIntent(
+  model: LlamaLanguageModel,
+  prompt: string,
+  modelId: string,
+  requestId: string,
+  abortSignal?: AbortSignal,
+) {
+  logModelPipeline("intent_structured_input", {
+    requestId,
+    modelId,
+    promptLength: prompt.length,
+    prompt,
+  });
+  const { output } = await withGenerationTimeout(
+    requestId,
+    modelId,
+    "intent_structured_generation",
+    abortSignal,
+    (signal) =>
+      generateText({
+        model,
+        prompt,
+        temperature: 0.1,
+        maxOutputTokens: 120,
+        output: INTENT_OUTPUT,
+        abortSignal: signal,
+      }),
+  );
+  logModelPipeline("intent_structured_output", { requestId, modelId, output });
   return output;
 }
 
@@ -234,6 +347,59 @@ async function generateTextRecommendation(
     throw new Error(
       `Local model returned unparsable recommendation text: ${text.slice(0, 240)}`,
     );
+  }
+  return parsed;
+}
+
+async function generateTextIntent(
+  model: LlamaLanguageModel,
+  prompt: string,
+  request: LocalRecommendationRequest,
+  modelId: string,
+  requestId: string,
+  structuredError: unknown,
+  abortSignal?: AbortSignal,
+  stagePrefix = "intent_fallback",
+) {
+  if (stagePrefix === "intent_fallback") {
+    console.info(
+      "Structured local-intent parsing failed; using tolerant JSON extraction fallback.",
+      structuredError,
+    );
+  }
+  const fallbackPrompt = `${prompt}\n\nReturn only one JSON object and nothing else.`;
+  logModelPipeline(`${stagePrefix}_input`, {
+    requestId,
+    modelId,
+    triggerReason: structuredError,
+    promptLength: fallbackPrompt.length,
+    prompt: fallbackPrompt,
+  });
+  const { text } = await withGenerationTimeout(
+    requestId,
+    modelId,
+    "intent_fallback_generation",
+    abortSignal,
+    (signal) =>
+      generateText({
+        model,
+        prompt: fallbackPrompt,
+        temperature: 0.05,
+        maxOutputTokens: 80,
+        abortSignal: signal,
+      }),
+  );
+  logModelPipeline(`${stagePrefix}_output_raw_text`, {
+    requestId,
+    modelId,
+    textLength: text.length,
+    text,
+  });
+
+  const parsed = extractJsonObjectFromText(text);
+  logModelPipeline(`${stagePrefix}_output_parsed_json`, { requestId, modelId, parsed });
+  if (!isModelIntentPayload(parsed)) {
+    return { userIntent: buildFallbackIntentFromContext(request) };
   }
   return parsed;
 }
@@ -417,6 +583,15 @@ function isModelRecommendationPayload(value: unknown): value is ModelRecommendat
   );
 }
 
+function isModelIntentPayload(value: unknown): value is ModelIntentPayload {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "userIntent" in value &&
+    typeof (value as { userIntent: unknown }).userIntent === "string"
+  );
+}
+
 async function loadModelWithParams(
   modelPath: string,
   contextParams: { n_ctx: number; n_gpu_layers: number },
@@ -439,6 +614,7 @@ function getFallbackContextParams() {
 
 function normalizeModelResponse(
   parsed: ModelRecommendationPayload,
+  userIntent: string,
   request: LocalRecommendationRequest,
   modelId: string,
 ): LocalRecommendationResponse {
@@ -450,6 +626,7 @@ function normalizeModelResponse(
 
   return {
     merchantId: parsed.merchantId,
+    userIntent,
     confidence: clampConfidence(parsed.confidence),
     reasoningTags: ["native_gguf_model", ...normalizeStringArray(parsed.reasoningTags)],
     rankedMerchantIds: normalizeRankedMerchantIds(parsed, knownMerchantIds),
@@ -481,4 +658,28 @@ function normalizeRankedMerchantIds(
   return Array.from(
     new Set([parsed.merchantId, ...normalizeStringArray(parsed.rankedMerchantIds)]),
   ).filter((merchantId) => knownMerchantIds.has(merchantId));
+}
+
+function normalizeIntent(intent: unknown, request: LocalRecommendationRequest) {
+  if (typeof intent !== "string") {
+    return buildFallbackIntentFromContext(request);
+  }
+  const normalized = intent
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/-+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (normalized.length === 0) {
+    return buildFallbackIntentFromContext(request);
+  }
+  return normalized.slice(0, 64);
+}
+
+function buildFallbackIntentFromContext(request: LocalRecommendationRequest) {
+  const firstIntent = request.context.intentLabels[0] ?? "browsing";
+  const firstDemand = request.context.demandTags[0] ?? "local_discovery";
+  return `${firstIntent}_${firstDemand}`.replaceAll("-", "_");
 }
