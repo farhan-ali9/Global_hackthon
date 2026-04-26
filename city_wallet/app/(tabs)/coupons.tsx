@@ -94,7 +94,7 @@ export default function CouponsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Nearby Coupons</Text>
-          <Text style={styles.subtitle}>Sorted by distance · Munich</Text>
+          <Text style={styles.subtitle}>Sorted by distance · Linz</Text>
         </View>
         <View style={styles.countBadge}>
           <Text style={styles.countText}>{COUPONS.length}</Text>

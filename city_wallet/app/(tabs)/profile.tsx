@@ -29,7 +29,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>Sofia Müller</Text>
-            <Text style={styles.profileSub}>Munich resident · Member since 2022</Text>
+            <Text style={styles.profileSub}>Linz resident · Member since 2022</Text>
           </View>
         </View>
         <View style={styles.statsRow}>

@@ -45,3 +45,9 @@ export const merchantRankingDecisionSchema = z.object({
     )
     .min(1),
 });
+
+export const localRecommendationSchema = z.object({
+  merchantId: z.string().min(1),
+  confidence: z.coerce.number().min(0).max(1).optional(),
+  reasoningTags: z.array(z.string()).max(5).default([]),
+});

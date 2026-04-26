@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dklingbeil.city-wallet"
+      "bundleIdentifier": "com.dklingbeil.city-wallet",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "City Wallet uses your location while the app is open to find nearby participating merchants and local offers."
+      }
     },
     "android": {
       "adaptiveIcon": {

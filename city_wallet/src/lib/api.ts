@@ -1,5 +1,4 @@
 import type {
-  AnonymizedContextPayload,
   GeneratedCouponResponse,
   GeneratedOfferResponse,
   GenerateCouponRequest,
@@ -21,7 +20,7 @@ export async function getMerchantCandidates(
 }
 
 export async function generateOffer(
-  payload: SelectedOfferRequest | AnonymizedContextPayload,
+  payload: SelectedOfferRequest,
 ): Promise<GeneratedOfferResponse> {
   return request("/offers/generate", {
     method: "POST",

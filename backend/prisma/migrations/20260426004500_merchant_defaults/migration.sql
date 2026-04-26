@@ -1,0 +1,5 @@
+ALTER TABLE "Merchant"
+  ALTER COLUMN "name" SET DEFAULT '',
+  ALTER COLUMN "category" SET DEFAULT 'CAFE',
+  ALTER COLUMN "zoneId" SET DEFAULT '',
+  ALTER COLUMN "distanceMeters" SET DEFAULT 0;

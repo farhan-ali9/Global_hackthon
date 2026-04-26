@@ -3,20 +3,32 @@ import { Platform } from "react-native";
 import type { z } from "zod";
 
 import {
+  localRecommendationSchema,
   merchantRankingDecisionSchema,
   offerIntentSchema,
 } from "@/src/ai/schemas";
-import type { LocalSignalSnapshot } from "@/src/context-engine/ContextProvider";
 import type {
+  LocalRecommendationRequest,
+  LocalRecommendationResponse,
   MerchantCandidate,
   OfferIntent,
   SelectedOfferRequest,
+  UserContext,
 } from "@/src/types/city-wallet";
 
 type LlamaModule = typeof import("@react-native-ai/llama");
 type LlamaLanguageModel = InstanceType<LlamaModule["LlamaLanguageModel"]>;
 type DownloadProgress = import("@react-native-ai/llama").DownloadProgress;
 type MerchantRankingDecision = z.infer<typeof merchantRankingDecisionSchema>;
+
+export type LocalSignalSnapshot =
+  | UserContext
+  | {
+      cityId: string;
+      zoneId?: string;
+      localSignalSummary?: string;
+      capturedAt?: string;
+    };
 
 export const DEFAULT_ON_DEVICE_MODEL_ID =
   process.env.EXPO_PUBLIC_ON_DEVICE_MODEL_ID ??
@@ -199,6 +211,33 @@ class OnDeviceLlamaModelManager {
     };
   }
 
+  async recommendMerchant(
+    request: LocalRecommendationRequest,
+  ): Promise<LocalRecommendationResponse> {
+    if (request.merchants.length === 0) {
+      throw new Error("Cannot recommend a merchant from an empty merchant list");
+    }
+
+    const model = this.requirePreparedModel();
+    const { object } = await generateObject({
+      model,
+      schema: localRecommendationSchema,
+      schemaName: "LocalRecommendationResponse",
+      schemaDescription:
+        "Local merchant recommendation. merchantId must be one of the provided merchant ids.",
+      temperature: 0,
+      maxOutputTokens: 300,
+      experimental_repairText: repairJsonObjectOutput,
+      system:
+        "Return only valid JSON. Do not use markdown. You recommend a merchant on-device using precise private user context. Do not include coordinates or raw private context in the output.",
+      prompt: buildLocalRecommendationPrompt(request),
+    });
+
+    assertKnownMerchantSummary(object.merchantId, request.merchants);
+
+    return object;
+  }
+
   private requirePreparedModel(): LlamaLanguageModel {
     if (!this.languageModel) {
       throw new OnDeviceModelUnavailableError(
@@ -236,14 +275,14 @@ function buildIntentPrompt(localSignals: LocalSignalSnapshot) {
   return [
     `Required cityId: ${localSignals.cityId}`,
     `Private local zone, if available: ${localSignals.zoneId ?? "not provided"}`,
-    `Captured at: ${localSignals.capturedAt ?? new Date().toISOString()}`,
+    `Captured at: ${getCapturedAt(localSignals)}`,
     "Private local signal summary:",
-    localSignals.localSignalSummary || "No private signal summary provided.",
+    getLocalSignalSummary(localSignals),
     "Allowed intentLabels: browsing, hungry, seeking_warmth, commuting, social.",
     "Allowed weatherBucket: clear, cloudy, rain, cold, hot.",
     "Allowed timeOfDay: morning, lunch, afternoon, evening.",
     "Return JSON with exactly these keys: cityId, timeOfDay, weatherBucket, intentLabels, eventTags, demandTags.",
-    'Example: {"cityId":"stuttgart-demo","timeOfDay":"lunch","weatherBucket":"cold","intentLabels":["browsing","seeking_warmth"],"eventTags":[],"demandTags":["quiet"]}',
+    'Example: {"cityId":"linz-demo","timeOfDay":"lunch","weatherBucket":"cold","intentLabels":["browsing","seeking_warmth"],"eventTags":[],"demandTags":["quiet"]}',
   ].join("\n");
 }
 
@@ -259,7 +298,7 @@ function buildRankingPrompt(
     JSON.stringify(
       {
         zoneId: localSignals.zoneId,
-        localSignalSummary: localSignals.localSignalSummary,
+        localSignalSummary: getLocalSignalSummary(localSignals),
       },
       null,
       2,
@@ -271,6 +310,20 @@ function buildRankingPrompt(
   ].join("\n\n");
 }
 
+function buildLocalRecommendationPrompt(request: LocalRecommendationRequest) {
+  return [
+    "Pick the best merchant for this user context.",
+    "Return JSON with exactly these keys: merchantId, confidence, reasoningTags.",
+    'Example: {"merchantId":"merchant-cafe-mueller","confidence":0.82,"reasoningTags":["nearby","lunch","weather_fit"]}',
+    "",
+    "Private user context, available only on-device:",
+    JSON.stringify(request.context, null, 2),
+    "",
+    "Merchant summaries:",
+    JSON.stringify(request.merchants, null, 2),
+  ].join("\n");
+}
+
 function assertKnownCandidate(
   selectedMerchantId: string,
   candidates: MerchantCandidate[],
@@ -280,6 +333,55 @@ function assertKnownCandidate(
   if (!candidateIds.has(selectedMerchantId)) {
     throw new Error("Model selected a merchant outside the candidate set.");
   }
+}
+
+function assertKnownMerchantSummary(
+  merchantId: string,
+  merchants: LocalRecommendationRequest["merchants"],
+) {
+  if (!merchants.some((merchant) => merchant.id === merchantId)) {
+    throw new Error("Model selected a merchant outside the merchant set.");
+  }
+}
+
+function getCapturedAt(localSignals: LocalSignalSnapshot) {
+  if ("currentTimeIso" in localSignals) return localSignals.currentTimeIso;
+  return localSignals.capturedAt ?? new Date().toISOString();
+}
+
+function getLocalSignalSummary(localSignals: LocalSignalSnapshot) {
+  if (
+    "localSignalSummary" in localSignals &&
+    typeof localSignals.localSignalSummary === "string" &&
+    localSignals.localSignalSummary.trim()
+  ) {
+    return localSignals.localSignalSummary;
+  }
+
+  if ("currentTimeIso" in localSignals) {
+    return JSON.stringify(
+      {
+        zoneId: localSignals.zoneId,
+        coordinates: localSignals.coordinates,
+        coordinateAccuracyMeters: localSignals.coordinateAccuracyMeters,
+        currentTimeIso: localSignals.currentTimeIso,
+        timezone: localSignals.timezone,
+        locale: localSignals.locale,
+        dayOfWeek: localSignals.dayOfWeek,
+        isWeekend: localSignals.isWeekend,
+        timeOfDay: localSignals.timeOfDay,
+        weather: localSignals.weather,
+        intentLabels: localSignals.intentLabels,
+        eventTags: localSignals.eventTags,
+        demandTags: localSignals.demandTags,
+        mobilityState: localSignals.mobilityState,
+      },
+      null,
+      2,
+    );
+  }
+
+  return "No private signal summary provided.";
 }
 
 function toErrorMessage(error: unknown) {

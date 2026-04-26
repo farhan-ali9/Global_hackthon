@@ -37,19 +37,21 @@ export function createLlmCouponGenerator(
   prisma: PrismaClient,
   config: LlmCouponGeneratorConfig,
 ): LlmCouponGenerator {
-  if (!config.apiKey) {
-    throw new Error("OPENROUTER_API_KEY is required to start the coupon generator");
-  }
   const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
 
   return {
     async generate({ merchantId, context }) {
       const merchant = await prisma.merchant.findUnique({
         where: { id: merchantId },
+        include: { rule: true },
       });
 
       if (!merchant) {
         throw httpError(404, `Merchant ${merchantId} not found`);
+      }
+
+      if (!config.apiKey) {
+        return buildLocalFallbackCoupon(merchant, context);
       }
 
       const payload = await callOpenRouter({
@@ -70,6 +72,33 @@ export function createLlmCouponGenerator(
         expiresAt: new Date(Date.now() + COUPON_TTL_MS).toISOString(),
       };
     },
+  };
+}
+
+function buildLocalFallbackCoupon(
+  merchant: {
+    id: string;
+    name: string;
+    description?: string | null;
+    rule?: { maxDiscountPercent: number } | null;
+  },
+  context: Record<string, unknown>,
+): GeneratedCouponResponse {
+  const maxDiscountPercent = merchant.rule?.maxDiscountPercent ?? 10;
+  const weatherBucket =
+    typeof context.weatherBucket === "string" ? context.weatherBucket : "local";
+  const timeOfDay =
+    typeof context.timeOfDay === "string" ? context.timeOfDay : "now";
+  const discountPercent = Math.min(maxDiscountPercent, 10);
+
+  return {
+    merchantId: merchant.id,
+    headline: `Local offer at ${merchant.name || merchant.id}`,
+    body: `${discountPercent}% off selected on-device for your ${timeOfDay} context and ${weatherBucket} conditions.`,
+    discountPercent,
+    ctaLabel: "Redeem now",
+    explanationTags: ["local-selection", timeOfDay, weatherBucket],
+    expiresAt: new Date(Date.now() + COUPON_TTL_MS).toISOString(),
   };
 }
 

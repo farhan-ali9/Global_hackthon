@@ -9,10 +9,10 @@ import type {
 } from "@/src/types/city-wallet";
 
 export const demoCity: CityConfig = {
-  id: "stuttgart-demo",
-  name: "Configurable Demo City",
+  id: "linz-demo",
+  name: "Linz Demo City",
   countryCode: "DE",
-  center: { latitude: 48.7758, longitude: 9.1829 },
+  center: { latitude: 48.3069, longitude: 14.2858 },
   enabledSignals: ["location", "weather", "time", "demand"],
 };
 
@@ -269,7 +269,7 @@ export const REDEEMED_COUPONS: Coupon[] = [
 
 /* ──────────────────────────────────────────────────────────────────
    MAP MERCHANTS  – each coupon's real-world pin for the map view.
-   Coordinates are real locations in Munich city centre.
+   Coordinates are approximate demo locations in Linz city centre.
    ────────────────────────────────────────────────────────────────── */
 export type MapMerchant = {
   id: string;
@@ -294,8 +294,8 @@ export const MAP_MERCHANTS: MapMerchant[] = [
     brandColor: "#DA291C",
     accentColor: "#FFC72C",
     offer: "20% OFF",
-    latitude: 48.1366,
-    longitude: 11.5748,
+    latitude: 48.3059,
+    longitude: 14.2864,
   },
   {
     id: "starbucks",
@@ -306,8 +306,8 @@ export const MAP_MERCHANTS: MapMerchant[] = [
     brandColor: "#00704A",
     accentColor: "#CBA258",
     offer: "Buy 1 Get 1",
-    latitude: 48.1373,
-    longitude: 11.5754,
+    latitude: 48.3068,
+    longitude: 14.2858,
   },
   {
     id: "hm",
@@ -318,8 +318,8 @@ export const MAP_MERCHANTS: MapMerchant[] = [
     brandColor: "#E50010",
     accentColor: "#222222",
     offer: "15% OFF",
-    latitude: 48.1378,
-    longitude: 11.5693,
+    latitude: 48.3039,
+    longitude: 14.2901,
   },
   {
     id: "cinema",
@@ -329,8 +329,8 @@ export const MAP_MERCHANTS: MapMerchant[] = [
     brandColor: "#1a1a2e",
     accentColor: "#e94560",
     offer: "€4 OFF",
-    latitude: 48.1356,
-    longitude: 11.5706,
+    latitude: 48.3047,
+    longitude: 14.2891,
   },
   {
     id: "zara",
@@ -341,8 +341,8 @@ export const MAP_MERCHANTS: MapMerchant[] = [
     brandColor: "#212121",
     accentColor: "#9E9E9E",
     offer: "10% OFF",
-    latitude: 48.1382,
-    longitude: 11.5720,
+    latitude: 48.3027,
+    longitude: 14.2914,
   },
   {
     id: "ikea",
@@ -353,8 +353,8 @@ export const MAP_MERCHANTS: MapMerchant[] = [
     brandColor: "#0058A3",
     accentColor: "#FFDA1A",
     offer: "€10 OFF",
-    latitude: 48.1301,
-    longitude: 11.5822,
+    latitude: 48.3145,
+    longitude: 14.2942,
   },
   {
     id: "bakery",
@@ -364,8 +364,8 @@ export const MAP_MERCHANTS: MapMerchant[] = [
     brandColor: "#7B4A1E",
     accentColor: "#F4C87A",
     offer: "2 FOR 1",
-    latitude: 48.1340,
-    longitude: 11.5775,
+    latitude: 48.3079,
+    longitude: 14.2839,
   },
   {
     id: "fitness",
@@ -375,10 +375,10 @@ export const MAP_MERCHANTS: MapMerchant[] = [
     brandColor: "#0D47A1",
     accentColor: "#42A5F5",
     offer: "FREE DAY",
-    latitude: 48.1420,
-    longitude: 11.5660,
+    latitude: 48.3008,
+    longitude: 14.2872,
   },
 ];
 
-/** User's current (mock) location — Marienplatz, Munich */
-export const USER_LOCATION = { latitude: 48.1372, longitude: 11.5756 };
+/** User's current (mock) location — Hauptplatz, Linz */
+export const USER_LOCATION = { latitude: 48.3069, longitude: 14.2858 };

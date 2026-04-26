@@ -54,7 +54,7 @@ intentionally **not** included — they're merchant strategy data the server
 keeps private.
 
 ```bash
-curl http://localhost:4000/merchants?cityId=stuttgart-demo
+curl http://localhost:4000/merchants?cityId=linz-demo
 ```
 
 ```json
@@ -62,8 +62,8 @@ curl http://localhost:4000/merchants?cityId=stuttgart-demo
   {
     "id": "merchant-cafe-mueller",
     "description": "Cafe Mueller — small specialty coffee bar on Schlossplatz...",
-    "cityId": "stuttgart-demo",
-    "coordinates": { "latitude": 48.7784, "longitude": 9.1801 }
+    "cityId": "linz-demo",
+    "coordinates": { "latitude": 48.3069, "longitude": 14.2858 }
   }
 ]
 ```

@@ -130,8 +130,6 @@ export type UserContext = {
   privacyLevel: "device_precise";
 };
 
-export type AnonymizedContextPayload = UserContext;
-
 export type MerchantSummary = {
   id: string;
   description: string;

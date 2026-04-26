@@ -29,7 +29,7 @@
 - Added `POST /coupons/generate` accepting `{merchantId, context}` and
   calling OpenRouter via built-in `fetch` with the merchant's markdown
   rules as authoritative system-prompt constraints. No DB persistence.
-- Reseeded with 6 mock Stuttgart merchants (cafe, bistro, bookshop,
+- Reseeded with 6 mock Linz merchants (cafe, bistro, bookshop,
   gelateria, museum shop, bike rental), each with a markdown `rules`
   block.
 - New env vars: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`.

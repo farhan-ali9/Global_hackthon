@@ -13,12 +13,12 @@ export type ContextProvider = {
 };
 
 const DEFAULT_COORDINATES = {
-  latitude: 48.7784,
-  longitude: 9.1801,
+  latitude: 48.3069,
+  longitude: 14.2858,
 };
 
-const DEFAULT_CITY_ID = "stuttgart-demo";
-const DEFAULT_ZONE_ID = "old-town";
+const DEFAULT_CITY_ID = process.env.EXPO_PUBLIC_DEFAULT_CITY_ID ?? "linz-demo";
+const DEFAULT_ZONE_ID = "hauptplatz";
 
 export const deviceContextProvider: ContextProvider = {
   async getUserContext() {

@@ -1,3 +1,4 @@
+import { getOnDeviceLlamaModelManager } from "@/src/ai/onDeviceLlamaPipeline";
 import type {
   LocalRecommendationRequest,
   LocalRecommendationResponse,
@@ -23,16 +24,32 @@ export async function recommendMerchant(
     throw new Error("Cannot recommend a merchant from an empty merchant list");
   }
 
-  const recommendation =
-    localMerchantModelClient === null
-      ? getFallbackRecommendation(request)
-      : await localMerchantModelClient.recommendMerchant(request);
+  const recommendation = await getRecommendation(request);
 
   if (!request.merchants.some((merchant) => merchant.id === recommendation.merchantId)) {
     throw new Error(`Local model recommended unknown merchant ${recommendation.merchantId}`);
   }
 
   return recommendation;
+}
+
+async function getRecommendation(
+  request: LocalRecommendationRequest,
+): Promise<LocalRecommendationResponse> {
+  try {
+    if (localMerchantModelClient !== null) {
+      return await localMerchantModelClient.recommendMerchant(request);
+    }
+
+    const modelManager = getOnDeviceLlamaModelManager();
+    if (modelManager.modelStatus.isPrepared) {
+      return await modelManager.recommendMerchant(request);
+    }
+  } catch {
+    return getFallbackRecommendation(request);
+  }
+
+  return getFallbackRecommendation(request);
 }
 
 export function buildLocalModelPrompt(request: LocalRecommendationRequest) {
