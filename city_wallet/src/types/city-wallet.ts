@@ -98,6 +98,13 @@ export type WeatherSituation = {
   source: "placeholder" | "device" | "weather_api";
 };
 
+export type PersonalInfo = {
+  name: string;
+  city: string;
+  bio: string;
+  avatarColor: string;
+};
+
 export type OnboardingAnswer = {
   questionId: string;
   questionTitle: string;

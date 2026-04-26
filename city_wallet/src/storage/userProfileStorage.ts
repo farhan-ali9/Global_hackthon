@@ -1,9 +1,11 @@
 import * as SQLite from "expo-sqlite";
 
-import type { OnboardingAnswer, UserProfile } from "@/src/types/city-wallet";
+import type { OnboardingAnswer, PersonalInfo, UserProfile } from "@/src/types/city-wallet";
 
 const DATABASE_NAME = "city-wallet.db";
 const PROFILE_ID = "local-user";
+
+export const DEFAULT_AVATAR_COLOR = "#c5a880";
 
 type UserProfileRow = {
   id: string;
@@ -66,9 +68,44 @@ async function openAndMigrateDatabase() {
       completedAtIso TEXT NOT NULL,
       updatedAtIso TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS user_personal_info (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL DEFAULT '',
+      city TEXT NOT NULL DEFAULT '',
+      bio TEXT NOT NULL DEFAULT '',
+      avatarColor TEXT NOT NULL DEFAULT '${DEFAULT_AVATAR_COLOR}'
+    );
   `);
 
   return db;
+}
+
+export async function savePersonalInfo(info: PersonalInfo): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `INSERT INTO user_personal_info (id, name, city, bio, avatarColor)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       name        = excluded.name,
+       city        = excluded.city,
+       bio         = excluded.bio,
+       avatarColor = excluded.avatarColor`,
+    PROFILE_ID,
+    info.name,
+    info.city,
+    info.bio,
+    info.avatarColor,
+  );
+}
+
+export async function getPersonalInfo(): Promise<PersonalInfo | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<PersonalInfo>(
+    `SELECT name, city, bio, avatarColor FROM user_personal_info WHERE id = ?`,
+    PROFILE_ID,
+  );
+  return row ?? null;
 }
 
 function parseAnswers(answersJson: string): OnboardingAnswer[] {

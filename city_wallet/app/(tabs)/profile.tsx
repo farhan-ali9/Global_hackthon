@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useNavigation, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,17 +19,20 @@ import {
   scheduleCouponDigest,
   sendDemoCouponNotification,
 } from "@/src/services/notifications";
+import {
+  DEFAULT_AVATAR_COLOR,
+  getPersonalInfo,
+} from "@/src/storage/userProfileStorage";
 import { CW, fontFamily } from "@/src/theme/tokens";
 
 const STATS = [
-  { l: "City Score", v: "94" },
-  { l: "Trips",      v: "340" },
-  { l: "CO₂ Saved",  v: "128kg" },
+  { l: "Points",   v: "1 240" },
+  { l: "Saved",    v: "€38" },
+  { l: "Redeemed", v: "12" },
 ];
 
 const ACCOUNT_SECTIONS = [
-  { title: "Account",     items: ["Personal Information", "City Registration", "Linked Documents"] },
-  { title: "Wallet",      items: ["Payment Methods", "Auto Top-up", "Spending Limits"] },
+  { title: "Account",     items: ["Personal Information"] },
   { title: "Preferences", items: ["Language & Region", "Privacy & Data"] },
 ];
 
@@ -42,6 +45,23 @@ export default function ProfileScreen() {
   const [tokenText, setTokenText]         = useState<string | null>(null);
   const [registering, setRegistering]     = useState(false);
   const [sending, setSending]             = useState(false);
+
+  const [displayName,  setDisplayName]  = useState("Sofia Müller");
+  const [displayCity,  setDisplayCity]  = useState("Linz");
+  const [avatarColor,  setAvatarColor]  = useState(DEFAULT_AVATAR_COLOR);
+
+  /* Reload personal info every time the tab is focused (e.g. after editing) */
+  useFocusEffect(
+    useCallback(() => {
+      void getPersonalInfo().then((info) => {
+        if (info) {
+          if (info.name) setDisplayName(info.name);
+          if (info.city) setDisplayCity(info.city);
+          setAvatarColor(info.avatarColor);
+        }
+      });
+    }, []),
+  );
 
   /* Try to auto-register on mount (permission may already be granted) */
   useEffect(() => {
@@ -127,12 +147,19 @@ export default function ProfileScreen() {
       {/* ── Profile card ── */}
       <View style={styles.profileCard}>
         <View style={styles.profileRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>S</Text>
-          </View>
+          <Pressable
+            style={({ pressed }) => [pressed && { opacity: 0.75 }]}
+            onPress={() => router.push("/personal-information")}
+          >
+            <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+              <Text style={styles.avatarText}>
+                {displayName.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?"}
+              </Text>
+            </View>
+          </Pressable>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Sofia Müller</Text>
-            <Text style={styles.profileSub}>Linz resident · Member since 2022</Text>
+            <Text style={styles.profileName}>{displayName}</Text>
+            <Text style={styles.profileSub}>{displayCity ? `${displayCity} resident · ` : ""}Member since 2022</Text>
           </View>
         </View>
         <View style={styles.statsRow}>
@@ -244,6 +271,11 @@ export default function ProfileScreen() {
                     ii < arr.length - 1 && styles.settingsBorder,
                     pressed && styles.pressed,
                   ]}
+                  onPress={() => {
+                    if (item === "Personal Information") {
+                      router.push("/personal-information");
+                    }
+                  }}
                 >
                   <Text style={styles.settingsItem}>{item}</Text>
                   <Text style={styles.chevron}>›</Text>
