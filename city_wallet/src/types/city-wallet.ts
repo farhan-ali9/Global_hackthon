@@ -136,6 +136,9 @@ export type LocalRecommendationResponse = {
   merchantId: string;
   confidence?: number;
   reasoningTags?: string[];
+  rankedMerchantIds?: string[];
+  modelId?: string;
+  modelSource?: "native_gguf" | "fallback";
 };
 
 export type GenerateCouponRequest = {

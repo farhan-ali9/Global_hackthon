@@ -148,39 +148,6 @@ function getTimeOfDay(date: Date): TimeOfDay {
   return "evening";
 }
 
-function getPlaceholderWeather(date: Date): WeatherSituation {
-  const month = date.getMonth();
-  const hour = date.getHours();
-
-  if (month <= 1 || month === 11) {
-    return {
-      bucket: "cold",
-      label: "Cold city weather",
-      temperatureCelsius: 4,
-      precipitationProbability: 0.25,
-      source: "placeholder",
-    };
-  }
-
-  if (month >= 5 && month <= 7 && hour >= 11 && hour <= 17) {
-    return {
-      bucket: "hot",
-      label: "Warm and bright",
-      temperatureCelsius: 27,
-      precipitationProbability: 0.1,
-      source: "placeholder",
-    };
-  }
-
-  return {
-    bucket: "cloudy",
-    label: "Mild and cloudy",
-    temperatureCelsius: 14,
-    precipitationProbability: 0.2,
-    source: "placeholder",
-  };
-}
-
 function getIntentLabels(
   timeOfDay: TimeOfDay,
   weatherBucket: WeatherBucket,

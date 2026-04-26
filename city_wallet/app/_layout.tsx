@@ -11,6 +11,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import "@/src/context-engine/registerLocalMerchantModelClient";
 import { UserContextLoopProvider } from "@/src/context-engine/UserContextLoopProvider";
 
 SplashScreen.preventAutoHideAsync();
