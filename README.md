@@ -1,5 +1,10 @@
 # City Wallet
 
+<p align="center">
+  <img src="docs/home-screen.png" alt="City Wallet mobile app screen" width="48%">
+  <img src="docs/coupon.png" alt="City Wallet merchant admin screen" width="48%">
+</p>
+
 City Wallet is a hackathon MVP for privacy-preserving local commerce. The app
 uses on-device context to choose a relevant nearby merchant, then asks a backend
 to generate a constrained coupon for that merchant without sending precise user
